@@ -3,17 +3,22 @@ package com.kanghyeon.todolist.presentation.screen
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -43,13 +48,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kanghyeon.todolist.data.local.entity.Priority
 import com.kanghyeon.todolist.data.local.entity.TaskEntity
 import com.kanghyeon.todolist.presentation.theme.OverdueRed
+import com.kanghyeon.todolist.presentation.theme.PriorityHigh
+import com.kanghyeon.todolist.presentation.theme.PriorityLow
+import com.kanghyeon.todolist.presentation.theme.PriorityMedium
 import com.kanghyeon.todolist.presentation.viewmodel.TaskEvent
 import com.kanghyeon.todolist.presentation.viewmodel.TaskUiState
 import com.kanghyeon.todolist.presentation.viewmodel.TaskViewModel
@@ -275,18 +286,27 @@ private fun TodayContent(
 }
 
 // ══════════════════════════════════════════════════════════════════
-// 탭 콘텐츠: 전체
+// 탭 콘텐츠: 전체 (중요도 섹션 분리)
 // ══════════════════════════════════════════════════════════════════
 
+/**
+ * 미완료 항목을 HIGH / MEDIUM / LOW 섹션으로 나눠 stickyHeader로 표시.
+ * 각 섹션 헤더는 스크롤 시 상단에 고정된다.
+ *
+ * 데이터 출처: [TaskUiState.sortedTasks]
+ *   - DB에서 priority DESC, createdAt DESC 순으로 이미 정렬되어 옴
+ *   - UI에서 groupBy(Priority)하여 섹션별로 분리
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AllContent(
     uiState: TaskUiState,
     viewModel: TaskViewModel,
 ) {
-    val incompleteTasks = uiState.allTasks.filter { !it.isDone }
-    val completedTasks  = uiState.completedTasks
+    val grouped       = uiState.sortedTasks.groupBy { Priority.from(it.priority) }
+    val completedTasks = uiState.completedTasks
 
-    if (incompleteTasks.isEmpty() && completedTasks.isEmpty()) {
+    if (uiState.sortedTasks.isEmpty() && completedTasks.isEmpty()) {
         EmptyContent(
             icon = Icons.Outlined.CheckCircle,
             message = "할 일이 없어요",
@@ -295,37 +315,57 @@ private fun AllContent(
         return
     }
 
+    // priority → (레이블, 액센트 색상)
+    data class PriorityMeta(val label: String, val accent: Color)
+    val priorityMeta = mapOf(
+        Priority.HIGH   to PriorityMeta("높음", PriorityHigh),
+        Priority.MEDIUM to PriorityMeta("중간", PriorityMedium),
+        Priority.LOW    to PriorityMeta("낮음", PriorityLow),
+    )
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // ── 미완료 목록 ───────────────────────────────────
-        if (incompleteTasks.isNotEmpty()) {
-            item(key = "incomplete_header") {
-                SectionHeader(title = "할 일", count = incompleteTasks.size)
+        // ── 중요도별 섹션 카드 (HIGH → MEDIUM → LOW) ─────────
+        Priority.entries
+            .sortedByDescending { it.value }
+            .forEach { priority ->
+                val tasks = grouped[priority]
+                if (!tasks.isNullOrEmpty()) {
+                    val meta = priorityMeta.getValue(priority)
+
+                    // 섹션 헤더 (스크롤 시 상단 고정)
+                    stickyHeader(key = "priority_header_${priority.name}") {
+                        PrioritySectionHeader(
+                            label = meta.label,
+                            count = tasks.size,
+                            dotColor = meta.accent,
+                        )
+                    }
+
+                    // 해당 priority의 모든 Task를 하나의 ElevatedCard로 묶음
+                    item(key = "priority_card_${priority.name}") {
+                        PriorityGroupCard(
+                            tasks = tasks,
+                            accentColor = meta.accent,
+                            bgColor = MaterialTheme.colorScheme.surface,
+                            onToggleDone = { task -> viewModel.toggleDone(task.id, task.isDone) },
+                            onDelete = { task -> viewModel.deleteTask(task) },
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
+                }
             }
-            items(
-                items = incompleteTasks,
-                key = { "all_${it.id}" },
-            ) { task ->
-                TaskItem(
-                    task = task,
-                    onToggleDone = { viewModel.toggleDone(task.id, task.isDone) },
-                    onDelete = { viewModel.deleteTask(task) },
-                    modifier = Modifier.animateItem(),
-                )
-            }
-        }
 
         // ── 완료 목록 ─────────────────────────────────────
         if (completedTasks.isNotEmpty()) {
-            item(key = "completed_header") {
-                Spacer(Modifier.height(8.dp))
-                SectionHeader(
-                    title = "완료됨",
+            stickyHeader(key = "priority_header_completed") {
+                PrioritySectionHeader(
+                    label = "완료됨",
                     count = completedTasks.size,
-                    titleColor = MaterialTheme.colorScheme.outline,
+                    dotColor = MaterialTheme.colorScheme.outline,
                 )
             }
             items(
@@ -365,6 +405,51 @@ private fun SectionHeader(
             .fillMaxWidth()
             .padding(vertical = 4.dp),
     )
+}
+
+/**
+ * 중요도 섹션용 sticky 헤더.
+ *
+ * 스크롤 시 상단에 고정되므로 반드시 [MaterialTheme.colorScheme.surface] 배경을 깔아
+ * 아래 아이템이 비쳐 보이지 않도록 한다.
+ *
+ * @param dotColor 우선순위를 나타내는 색상 점 (HIGH=빨강, MEDIUM=주황, LOW=회색)
+ */
+@Composable
+private fun PrioritySectionHeader(
+    label: String,
+    count: Int,
+    dotColor: Color,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)  // sticky 시 아이템 가림
+            .padding(vertical = 6.dp),
+    ) {
+        // 우선순위 색상 점
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(dotColor),
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleSmall.copy(
+                fontWeight = FontWeight.SemiBold,
+                color = dotColor,
+            ),
+        )
+        Text(
+            text = count.toString(),
+            style = MaterialTheme.typography.titleSmall.copy(
+                color = MaterialTheme.colorScheme.outline,
+            ),
+        )
+    }
 }
 
 @Composable

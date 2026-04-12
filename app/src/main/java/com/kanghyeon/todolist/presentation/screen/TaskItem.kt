@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,7 +24,9 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -253,5 +257,188 @@ private fun SwipeDeleteBackground() {
             tint = Color.White,
             modifier = Modifier.size(24.dp),
         )
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 그룹 카드 — 전체 탭 우선순위 섹션에서 사용
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * 동일 우선순위 Task 목록을 하나의 ElevatedCard로 묶어 보여준다.
+ *
+ * [시각 구조]
+ * ElevatedCard (파스텔 배경, 좌측 4dp 액센트 바)
+ *   └── Column
+ *         ├── GroupedTaskRow(task0)
+ *         ├── HorizontalDivider
+ *         ├── GroupedTaskRow(task1)
+ *         └── ...
+ *
+ * @param accentColor  우선순위 대표 색상 (액센트 바 + 구분선)
+ * @param bgColor      파스텔 배경색 (accentColor.copy(alpha = 0.08f) 권장)
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PriorityGroupCard(
+    tasks: List<TaskEntity>,
+    accentColor: Color,
+    bgColor: Color,
+    onToggleDone: (TaskEntity) -> Unit,
+    onDelete: (TaskEntity) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ElevatedCard(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = bgColor),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+    ) {
+        // 좌측 액센트 바 + 태스크 목록을 가로로 배치
+        Row {
+            // 4dp 세로 액센트 바
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(accentColor),
+            )
+
+            Column(modifier = Modifier.weight(1f)) {
+                tasks.forEachIndexed { index, task ->
+                    GroupedTaskRow(
+                        task = task,
+                        onToggleDone = { onToggleDone(task) },
+                        onDelete = { onDelete(task) },
+                    )
+                    if (index < tasks.lastIndex) {
+                        HorizontalDivider(
+                            color = accentColor.copy(alpha = 0.15f),
+                            thickness = 1.dp,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * PriorityGroupCard 내부 단일 행 — 스와이프 삭제 지원.
+ *
+ * Card 셸이 없으므로 배경은 부모(ElevatedCard)에서 제공받는다.
+ * 액센트 바도 카드 레벨에서 처리하므로 이 Row는 순수 콘텐츠만 담는다.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GroupedTaskRow(
+    task: TaskEntity,
+    onToggleDone: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var isDeleted by remember { mutableStateOf(false) }
+
+    val swipeState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart && !isDeleted) {
+                isDeleted = true
+                onDelete()
+                true
+            } else false
+        },
+    )
+
+    val checkColor by animateColorAsState(
+        targetValue = if (task.isDone) MaterialTheme.colorScheme.primary else Color.Gray,
+        animationSpec = tween(300),
+        label = "groupedCheckColor",
+    )
+    val titleAlpha by animateFloatAsState(
+        targetValue = if (task.isDone) 0.4f else 1f,
+        animationSpec = tween(300),
+        label = "groupedTitleAlpha",
+    )
+
+    SwipeToDismissBox(
+        state = swipeState,
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            // 카드 안에서 스와이프 시 보이는 삭제 배경 (모서리 없이 꽉 채움)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(SwipeDeleteBackground)
+                    .padding(end = 20.dp),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "삭제",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        },
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // 체크 버튼
+            IconButton(
+                onClick = onToggleDone,
+                modifier = Modifier.size(40.dp),
+            ) {
+                val scale by animateFloatAsState(
+                    targetValue = if (task.isDone) 1.1f else 1f,
+                    animationSpec = tween(200),
+                    label = "groupedIconScale",
+                )
+                Icon(
+                    imageVector = if (task.isDone)
+                        Icons.Default.CheckCircle
+                    else
+                        Icons.Outlined.RadioButtonUnchecked,
+                    contentDescription = if (task.isDone) "완료 취소" else "완료",
+                    tint = checkColor,
+                    modifier = Modifier.scale(scale),
+                )
+            }
+
+            Spacer(Modifier.width(4.dp))
+
+            // 제목 + 부가 정보
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = task.title,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = titleAlpha),
+                        textDecoration = if (task.isDone)
+                            TextDecoration.LineThrough else TextDecoration.None,
+                    ),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (!task.description.isNullOrBlank()) {
+                    Text(
+                        text = task.description,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                .copy(alpha = titleAlpha),
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                task.dueDate?.let { DueDateChip(it) }
+            }
+        }
     }
 }

@@ -33,6 +33,11 @@ data class TaskUiState(
     val overdueTasks: List<TaskEntity> = emptyList(),
     val allTasks: List<TaskEntity> = emptyList(),
     val completedTasks: List<TaskEntity> = emptyList(),
+    /**
+     * 미완료 항목을 priority DESC → createdAt DESC 순으로 정렬한 목록.
+     * UI에서 HIGH / MEDIUM / LOW 섹션으로 groupBy해 stickyHeader에 사용.
+     */
+    val sortedTasks: List<TaskEntity> = emptyList(),
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
 )
@@ -77,12 +82,14 @@ class TaskViewModel @Inject constructor(
         repository.getOverdueTasks(),
         repository.getAllTasks(),
         repository.getCompletedTasks(),
-    ) { today, overdue, all, completed ->
+        repository.getSortedTasks(),
+    ) { today, overdue, all, completed, sorted ->
         TaskUiState(
             todayTasks = today,
             overdueTasks = overdue,
             allTasks = all,
             completedTasks = completed,
+            sortedTasks = sorted,
             isLoading = false,
         )
     }.stateIn(
