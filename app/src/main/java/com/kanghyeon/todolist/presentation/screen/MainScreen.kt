@@ -21,11 +21,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,19 +52,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kanghyeon.todolist.data.local.entity.Priority
+import com.kanghyeon.todolist.data.local.entity.TaskEntity
 import com.kanghyeon.todolist.presentation.theme.PriorityHigh
 import com.kanghyeon.todolist.presentation.theme.PriorityLow
 import com.kanghyeon.todolist.presentation.theme.PriorityMedium
 import com.kanghyeon.todolist.presentation.viewmodel.TaskEvent
 import com.kanghyeon.todolist.presentation.viewmodel.TaskUiState
 import com.kanghyeon.todolist.presentation.viewmodel.TaskViewModel
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 // ══════════════════════════════════════════════════════════════════
 // MainScreen — 루트 컴포저블
@@ -88,7 +97,10 @@ import com.kanghyeon.todolist.presentation.viewmodel.TaskViewModel
 fun MainScreen(
     viewModel: TaskViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val uiState      by viewModel.uiState.collectAsStateWithLifecycle()
+    val archiveDate  by viewModel.selectedArchiveDate.collectAsStateWithLifecycle()
+    val archiveTasks by viewModel.archiveTasks.collectAsStateWithLifecycle()
+
     val snackbarHostState = remember { SnackbarHostState() }
     var showBottomSheet by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -131,12 +143,12 @@ fun MainScreen(
                     )
                 },
                 actions = {
-                    // 아카이브 탭에서만 전체 삭제 버튼 노출
-                    if (selectedTab == 1 && uiState.completedTasks.isNotEmpty()) {
-                        IconButton(onClick = viewModel::clearCompleted) {
+                    // 아카이브 탭 + 선택 날짜에 항목이 있을 때만 삭제 버튼 노출
+                    if (selectedTab == 1 && archiveTasks.isNotEmpty()) {
+                        IconButton(onClick = viewModel::clearCompletedForSelectedDate) {
                             Icon(
                                 imageVector = Icons.Outlined.Delete,
-                                contentDescription = "완료 항목 전체 삭제",
+                                contentDescription = "이 날의 완료 항목 삭제",
                             )
                         }
                     }
@@ -171,7 +183,7 @@ fun MainScreen(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
                     text = {
-                        val count = uiState.sortedTasks.size
+                        val count = uiState.activeTasks.size
                         Text(if (count > 0) "할 일 ($count)" else "할 일")
                     },
                 )
@@ -189,7 +201,7 @@ fun MainScreen(
             when {
                 uiState.isLoading -> LoadingContent()
                 selectedTab == 0  -> TodoContent(uiState, viewModel)
-                else              -> ArchiveContent(uiState, viewModel)
+                else              -> ArchiveContent(archiveDate, archiveTasks, viewModel)
             }
         }
     }
@@ -219,7 +231,7 @@ fun MainScreen(
 /**
  * 미완료 할 일 전체를 HIGH / MEDIUM / LOW 섹션으로 나눠 표시.
  *
- * 데이터 출처: [TaskUiState.sortedTasks]
+ * 데이터 출처: [TaskUiState.activeTasks]
  *   - DAO: isDone = 0, ORDER BY priority DESC, createdAt DESC
  *   - UI : groupBy(Priority) → 섹션별 PriorityGroupCard
  */
@@ -229,7 +241,7 @@ private fun TodoContent(
     uiState: TaskUiState,
     viewModel: TaskViewModel,
 ) {
-    if (uiState.sortedTasks.isEmpty()) {
+    if (uiState.activeTasks.isEmpty()) {
         EmptyContent(
             icon = Icons.Outlined.CheckCircle,
             message = "할 일이 없어요",
@@ -238,7 +250,7 @@ private fun TodoContent(
         return
     }
 
-    val grouped = uiState.sortedTasks.groupBy { Priority.from(it.priority) }
+    val grouped = uiState.activeTasks.groupBy { Priority.from(it.priority) }
 
     data class PriorityMeta(val label: String, val accent: Color)
     val priorityMeta = mapOf(
@@ -285,41 +297,130 @@ private fun TodoContent(
 }
 
 // ══════════════════════════════════════════════════════════════════
-// 탭 콘텐츠: 아카이브 (완료된 할 일)
+// 탭 콘텐츠: 아카이브 (날짜별 완료 항목)
 // ══════════════════════════════════════════════════════════════════
 
+/**
+ * 상단 DaySelector로 날짜를 선택하면 해당 날짜에 완료된 할 일만 표시.
+ *
+ * 데이터 흐름:
+ *   ViewModel._selectedArchiveDate (MutableStateFlow)
+ *     └─ flatMapLatest → repository.getCompletedTasksByDate()
+ *         └─ archiveTasks (StateFlow) → 이 함수에서 수신
+ *
+ * @param archiveDate  현재 선택된 날짜의 시작 epoch ms
+ * @param archiveTasks 해당 날짜에 완료된 할 일 목록 (updatedAt DESC)
+ */
 @Composable
 private fun ArchiveContent(
-    uiState: TaskUiState,
+    archiveDate: Long,
+    archiveTasks: List<TaskEntity>,
     viewModel: TaskViewModel,
 ) {
-    if (uiState.completedTasks.isEmpty()) {
-        EmptyContent(
-            icon = Icons.Outlined.CheckCircle,
-            message = "완료된 할 일이 없어요",
-            subMessage = "할 일을 체크하면 여기에 기록됩니다.",
+    Column(modifier = Modifier.fillMaxSize()) {
+        // ── 날짜 선택기 ───────────────────────────────────
+        DaySelector(
+            dateMs    = archiveDate,
+            onPrevious = { viewModel.moveArchiveDate(-1) },
+            onNext     = { viewModel.moveArchiveDate(+1) },
         )
-        return
+        HorizontalDivider()
+
+        // ── 해당 날짜 완료 목록 ───────────────────────────
+        if (archiveTasks.isEmpty()) {
+            EmptyContent(
+                icon       = Icons.Outlined.CheckCircle,
+                message    = "이 날 완료된 할 일이 없어요",
+                subMessage = "할 일을 체크하면 날짜별로 기록됩니다.",
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(
+                    items = archiveTasks,
+                    key   = { "archive_${it.id}" },
+                ) { task ->
+                    TaskItem(
+                        task         = task,
+                        onToggleDone = { viewModel.toggleDone(task.id, task.isDone) },
+                        onDelete     = { viewModel.deleteTask(task) },
+                        modifier     = Modifier.animateItem(),
+                    )
+                }
+                item { Spacer(Modifier.height(24.dp)) }
+            }
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Day Selector — 아카이브 날짜 탐색 UI
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * 좌우 화살표로 날짜를 하루씩 이동하는 내비게이터.
+ *
+ * - 오늘 이후 날짜로는 이동 불가 (미래에 완료 항목이 존재할 수 없음)
+ * - java.time.LocalDate 기반 포맷팅 (minSdk 26 이상)
+ *
+ * @param dateMs    현재 선택된 날짜의 시작 epoch ms
+ * @param onPrevious 이전 날 버튼 클릭 콜백
+ * @param onNext     다음 날 버튼 클릭 콜백
+ */
+@Composable
+private fun DaySelector(
+    dateMs: Long,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+) {
+    val zone      = remember { ZoneId.systemDefault() }
+    val localDate = remember(dateMs) {
+        Instant.ofEpochMilli(dateMs).atZone(zone).toLocalDate()
+    }
+    val isToday   = remember(dateMs) { localDate == LocalDate.now(zone) }
+
+    val dateText  = remember(dateMs) {
+        localDate.format(
+            DateTimeFormatter.ofPattern("yyyy년 M월 d일 (E)", Locale.KOREA)
+        )
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment     = Alignment.CenterVertically,
     ) {
-        items(
-            items = uiState.completedTasks,
-            key = { "archive_${it.id}" },
-        ) { task ->
-            TaskItem(
-                task = task,
-                onToggleDone = { viewModel.toggleDone(task.id, task.isDone) },
-                onDelete = { viewModel.deleteTask(task) },
-                modifier = Modifier.animateItem(),
+        IconButton(onClick = onPrevious) {
+            Icon(
+                imageVector        = Icons.Default.KeyboardArrowLeft,
+                contentDescription = "이전 날",
             )
         }
 
-        item { Spacer(Modifier.height(24.dp)) }
+        Text(
+            text  = dateText,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
+        )
+
+        // 오늘이면 비활성화 (미래 이동 차단)
+        IconButton(
+            onClick  = onNext,
+            enabled  = !isToday,
+        ) {
+            Icon(
+                imageVector        = Icons.Default.KeyboardArrowRight,
+                contentDescription = "다음 날",
+                tint = if (isToday)
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.38f)
+                else
+                    MaterialTheme.colorScheme.onSurface,
+            )
+        }
     }
 }
 

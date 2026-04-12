@@ -24,51 +24,6 @@ interface TaskDao {
     // READ
     // ──────────────────────────────────────────
 
-    /** 전체 할 일 목록 (완료 포함, sortOrder → priority 순) */
-    @Query(
-        """
-        SELECT * FROM tasks
-        ORDER BY isDone ASC, priority DESC, sortOrder ASC
-        """
-    )
-    fun getAllTasks(): Flow<List<TaskEntity>>
-
-    /**
-     * 오늘의 할 일
-     * 조건: (마감일이 오늘 범위 내) OR (마감일 없고 미완료)
-     *       + 미완료 항목만 표시
-     *
-     * :startOfDay, :endOfDay = 자정 00:00:00.000 ~ 23:59:59.999 epoch ms
-     * → Repository의 todayRange() 헬퍼가 계산해서 전달
-     */
-    @Query(
-        """
-        SELECT * FROM tasks
-        WHERE isDone = 0
-          AND (
-            (dueDate >= :startOfDay AND dueDate <= :endOfDay)
-            OR dueDate IS NULL
-          )
-        ORDER BY priority DESC, sortOrder ASC
-        """
-    )
-    fun getTodayTasks(startOfDay: Long, endOfDay: Long): Flow<List<TaskEntity>>
-
-    /**
-     * 기한 초과(Overdue) 할 일
-     * 완료되지 않았고 마감일이 오늘 자정 이전인 항목
-     */
-    @Query(
-        """
-        SELECT * FROM tasks
-        WHERE isDone = 0
-          AND dueDate IS NOT NULL
-          AND dueDate < :startOfToday
-        ORDER BY dueDate ASC, priority DESC
-        """
-    )
-    fun getOverdueTasks(startOfToday: Long): Flow<List<TaskEntity>>
-
     /**
      * 잠금화면 노출 대상
      * showOnLockScreen = true 이고 미완료인 항목 (최대 표시 개수는 Service에서 take)
@@ -86,7 +41,7 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE id = :id")
     fun getTaskById(id: Long): Flow<TaskEntity?>
 
-    /** 완료된 할 일만 조회 (완료 목록 화면) */
+    /** 완료된 할 일만 조회 — 전체 (아카이브 탭 배지 카운트용) */
     @Query(
         """
         SELECT * FROM tasks
@@ -97,14 +52,48 @@ interface TaskDao {
     fun getCompletedTasks(): Flow<List<TaskEntity>>
 
     /**
-     * 중요도 섹션 정렬용 쿼리
+     * 특정 날짜에 완료된 할 일 조회 — 아카이브 Day Selector에서 사용.
      *
-     * 조건: 미완료 항목만 (isDone = 0)
-     * 정렬: priority DESC (HIGH=2 → MEDIUM=1 → LOW=0)
+     * 완료 시각 기준: [updateDoneStatus]에서 updatedAt을 갱신하므로
+     * updatedAt이 해당 날짜 범위에 속하면 "이 날 완료된 항목"으로 취급한다.
+     *
+     * 정렬: updatedAt DESC (최근 완료 순)
+     *
+     * :startOfDay = 00:00:00.000 epoch ms
+     * :endOfDay   = 23:59:59.999 epoch ms
+     */
+    @Query(
+        """
+        SELECT * FROM tasks
+        WHERE isDone = 1
+          AND updatedAt >= :startOfDay
+          AND updatedAt <= :endOfDay
+        ORDER BY updatedAt DESC
+        """
+    )
+    fun getCompletedTasksByDate(startOfDay: Long, endOfDay: Long): Flow<List<TaskEntity>>
+
+    /**
+     * 특정 날짜에 완료된 항목 일괄 삭제 — 아카이브 탭 삭제 버튼에서 사용.
+     */
+    @Query(
+        """
+        DELETE FROM tasks
+        WHERE isDone = 1
+          AND updatedAt >= :startOfDay
+          AND updatedAt <= :endOfDay
+        """
+    )
+    suspend fun deleteCompletedByDateRange(startOfDay: Long, endOfDay: Long)
+
+    /**
+     * 전체 활성(미완료) 할 일 — '할 일' 탭 메인 쿼리.
+     *
+     * 조건: isDone = 0 (날짜 필터 없음)
+     * 정렬: priority DESC (HIGH → MEDIUM → LOW)
      *       → 동일 priority 내에서 createdAt DESC (최근 생성 순)
      *
-     * UI의 LazyColumn stickyHeader 섹션 분리에 사용.
-     * groupBy는 ViewModel/UI 레이어에서 처리한다.
+     * UI에서 groupBy(Priority) 후 LazyColumn stickyHeader 섹션으로 표시.
      */
     @Query(
         """
@@ -113,7 +102,7 @@ interface TaskDao {
         ORDER BY priority DESC, createdAt DESC
         """
     )
-    fun getSortedTasks(): Flow<List<TaskEntity>>
+    fun getActiveTasks(): Flow<List<TaskEntity>>
 
     // ──────────────────────────────────────────
     // WRITE

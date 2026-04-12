@@ -9,11 +9,16 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import javax.inject.Inject
 
 // ──────────────────────────────────────────────────────────
@@ -23,21 +28,15 @@ import javax.inject.Inject
 /**
  * 화면 전체 상태를 표현하는 단일 불변 데이터 클래스.
  *
- * [왜 단일 UiState인가?]
- * - 여러 개의 StateFlow를 두면 UI가 각각 구독해야 하고,
- *   상태 간 조합 타이밍이 달라져 깜박임(race condition)이 발생할 수 있다.
- * - 하나의 StateFlow로 묶으면 UI는 단 하나의 collect()만 유지하면 된다.
+ * [탭 구조와 필드 매핑]
+ * - '할 일' 탭  : activeTasks  — isDone=false, priority·createdAt 정렬
+ * - '아카이브' 탭: completedTasks — 배지 카운트 전용 (날짜 필터링은 archiveTasks StateFlow 사용)
  */
 data class TaskUiState(
-    val todayTasks: List<TaskEntity> = emptyList(),
-    val overdueTasks: List<TaskEntity> = emptyList(),
-    val allTasks: List<TaskEntity> = emptyList(),
+    /** 전체 미완료 할 일 (priority DESC, createdAt DESC) — '할 일' 탭 표시용 */
+    val activeTasks: List<TaskEntity> = emptyList(),
+    /** 완료된 할 일 전체 — '아카이브' 탭 배지 카운트용 */
     val completedTasks: List<TaskEntity> = emptyList(),
-    /**
-     * 미완료 항목을 priority DESC → createdAt DESC 순으로 정렬한 목록.
-     * UI에서 HIGH / MEDIUM / LOW 섹션으로 groupBy해 stickyHeader에 사용.
-     */
-    val sortedTasks: List<TaskEntity> = emptyList(),
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
 )
@@ -67,36 +66,56 @@ class TaskViewModel @Inject constructor(
     private val repository: TaskRepository,
 ) : ViewModel() {
 
-    // ── 내부 로딩 상태 ──────────────────────────────────
-    private val _isLoading = MutableStateFlow(true)
-
-    // ── UI State (단일 StateFlow로 통합) ─────────────────
+    // ── UI State ─────────────────────────────────────────
     /**
-     * combine(): 4개의 Flow를 하나로 묶어 어떤 Flow가 방출돼도 UiState를 재조합.
+     * combine(active, completed):
+     * 두 Flow 중 하나라도 방출되면 UiState 재조합.
+     *
      * stateIn(WhileSubscribed(5_000)):
-     *   - 마지막 구독자가 떠난 후 5초간 업스트림을 유지 → 화면 회전 시 재구독 비용 없음
-     *   - 5초 초과 시 수집 중단 → 백그라운드 배터리 절약
+     * - 마지막 구독자가 떠난 후 5초간 업스트림 유지 → 화면 회전 시 재구독 비용 없음
+     * - 5초 초과 시 수집 중단 → 백그라운드 배터리 절약
      */
     val uiState: StateFlow<TaskUiState> = combine(
-        repository.getTodayTasks(),
-        repository.getOverdueTasks(),
-        repository.getAllTasks(),
+        repository.getActiveTasks(),
         repository.getCompletedTasks(),
-        repository.getSortedTasks(),
-    ) { today, overdue, all, completed, sorted ->
+    ) { active, completed ->
         TaskUiState(
-            todayTasks = today,
-            overdueTasks = overdue,
-            allTasks = all,
+            activeTasks    = active,
             completedTasks = completed,
-            sortedTasks = sorted,
-            isLoading = false,
+            isLoading      = false,
         )
     }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
+        scope        = viewModelScope,
+        started      = SharingStarted.WhileSubscribed(5_000),
         initialValue = TaskUiState(isLoading = true),
     )
+
+    // ── 아카이브 날짜 선택 상태 ──────────────────────────
+    /**
+     * 아카이브 탭 Day Selector의 선택 날짜 (00:00:00 epoch ms).
+     * [moveArchiveDate]로 ±1일 이동하며, 오늘 이후로는 이동 불가.
+     */
+    private val _selectedArchiveDate = MutableStateFlow(todayStartMs())
+    val selectedArchiveDate: StateFlow<Long> = _selectedArchiveDate.asStateFlow()
+
+    /**
+     * 선택된 날짜에 완료된 할 일 목록 (updatedAt 기준, DESC 정렬).
+     *
+     * flatMapLatest: _selectedArchiveDate가 바뀌면 이전 구독을 즉시 취소하고
+     * 새 날짜 쿼리로 재구독 → 날짜 전환 시 이전 데이터 잔류 없음.
+     */
+    val archiveTasks: StateFlow<List<TaskEntity>> = _selectedArchiveDate
+        .flatMapLatest { startMs ->
+            repository.getCompletedTasksByDate(
+                startOfDay = startMs,
+                endOfDay   = startMs + DAY_MS - 1,
+            )
+        }
+        .stateIn(
+            scope        = viewModelScope,
+            started      = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList(),
+        )
 
     // ── 일회성 이벤트 채널 ────────────────────────────────
     private val _eventChannel = Channel<TaskEvent>(Channel.BUFFERED)
@@ -121,10 +140,10 @@ class TaskViewModel @Inject constructor(
         viewModelScope.launch {
             repository.saveTask(
                 TaskEntity(
-                    title = title.trim(),
-                    description = description?.trim(),
-                    priority = priority,
-                    dueDate = dueDate,
+                    title            = title.trim(),
+                    description      = description?.trim(),
+                    priority         = priority,
+                    dueDate          = dueDate,
                     showOnLockScreen = showOnLockScreen,
                 )
             )
@@ -140,7 +159,7 @@ class TaskViewModel @Inject constructor(
 
     /**
      * 완료/미완료 토글
-     * @param id 변경할 Task의 ID
+     * @param id          변경할 Task의 ID
      * @param currentDone 현재 완료 상태 (반전값으로 저장)
      */
     fun toggleDone(id: Long, currentDone: Boolean) {
@@ -176,6 +195,40 @@ class TaskViewModel @Inject constructor(
     }
 
     /**
+     * 아카이브 탭에서 현재 선택된 날짜의 완료 항목만 삭제.
+     * 다른 날짜의 아카이브는 보존된다.
+     */
+    fun clearCompletedForSelectedDate() {
+        val startMs = _selectedArchiveDate.value
+        viewModelScope.launch {
+            repository.deleteCompletedByDate(
+                startOfDay = startMs,
+                endOfDay   = startMs + DAY_MS - 1,
+            )
+            emitEvent(TaskEvent.ShowMessage("선택한 날의 완료 항목을 삭제했습니다."))
+        }
+    }
+
+    /**
+     * 아카이브 날짜를 deltaDays만큼 이동.
+     * java.time.LocalDate 기반으로 DST·윤달을 안전하게 처리.
+     * 오늘 이후로는 이동 불가 (UI 버튼 비활성화와 병행).
+     *
+     * @param deltaDays +1 = 다음 날, -1 = 이전 날
+     */
+    fun moveArchiveDate(deltaDays: Int) {
+        _selectedArchiveDate.update { currentMs ->
+            val zone    = ZoneId.systemDefault()
+            val newDate = Instant.ofEpochMilli(currentMs)
+                .atZone(zone)
+                .toLocalDate()
+                .plusDays(deltaDays.toLong())
+            if (newDate.isAfter(LocalDate.now(zone))) return@update currentMs
+            newDate.atStartOfDay(zone).toInstant().toEpochMilli()
+        }
+    }
+
+    /**
      * 드래그 앤 드롭 완료 시 호출
      * @param reorderedList 새 순서대로 정렬된 Task 목록
      */
@@ -192,5 +245,16 @@ class TaskViewModel @Inject constructor(
 
     private fun emitEvent(event: TaskEvent) {
         viewModelScope.launch { _eventChannel.send(event) }
+    }
+
+    companion object {
+        private const val DAY_MS = 24 * 60 * 60 * 1_000L
+
+        /** 오늘 00:00:00.000 epoch ms (로컬 타임존 기준) */
+        fun todayStartMs(): Long =
+            LocalDate.now()
+                .atStartOfDay(ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli()
     }
 }

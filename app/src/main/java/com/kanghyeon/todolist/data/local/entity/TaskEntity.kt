@@ -12,7 +12,7 @@ import androidx.room.PrimaryKey
  * - priority를 enum 대신 Int로 저장 → TypeConverter 없이 직접 정렬 가능
  * - sortOrder로 사용자 정의 순서(드래그) 지원
  * - showOnLockScreen 플래그로 잠금화면 노출 여부를 개별 제어
- * - Index(isDone, dueDate) → getTodayTasks / getLockScreenTasks 쿼리 최적화
+ * - Index(isDone, dueDate) → getLockScreenTasks / getCompletedTasksByDate 쿼리 최적화
  */
 @Entity(
     tableName = "tasks",

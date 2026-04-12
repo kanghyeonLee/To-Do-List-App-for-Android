@@ -10,36 +10,30 @@ import kotlinx.coroutines.flow.Flow
  * - ViewModel이 데이터 출처(Room, Network 등)를 알 필요 없도록 추상화
  * - 테스트 시 FakeTaskRepository로 교체 가능
  *
- * [오늘의 할 일 정의]
- * - 마감일(dueDate)이 오늘 범위 내인 미완료 항목
- * - 마감일이 없고 미완료인 항목 (언제든 해야 하는 일)
- * - 기한 초과(overdue) 항목은 별도 스트림으로 분리 제공
+ * [탭 구조와 데이터 흐름]
+ * - '할 일' 탭  : getActiveTasks()  — 미완료 전체, priority + createdAt 정렬
+ * - '아카이브' 탭: getCompletedTasksByDate() — 날짜별 완료 항목
+ * - 잠금화면   : getLockScreenTasks() — ForegroundService가 구독
  */
 interface TaskRepository {
 
-    /** 전체 할 일 스트림 */
-    fun getAllTasks(): Flow<List<TaskEntity>>
-
     /**
-     * 오늘의 할 일 스트림
-     * Repository 구현체가 오늘의 시간 범위를 계산하여 DAO에 전달
+     * 전체 활성(미완료) 할 일 스트림 — '할 일' 탭 전용.
+     * priority DESC, createdAt DESC 정렬.
      */
-    fun getTodayTasks(): Flow<List<TaskEntity>>
-
-    /** 기한 초과 할 일 스트림 */
-    fun getOverdueTasks(): Flow<List<TaskEntity>>
+    fun getActiveTasks(): Flow<List<TaskEntity>>
 
     /** 잠금화면용 할 일 스트림 (ForegroundService가 구독) */
     fun getLockScreenTasks(): Flow<List<TaskEntity>>
 
-    /** 완료된 할 일 스트림 */
+    /** 완료된 할 일 스트림 — 전체 (아카이브 탭 배지 카운트용) */
     fun getCompletedTasks(): Flow<List<TaskEntity>>
 
     /**
-     * 미완료 할 일을 priority DESC, createdAt DESC 순으로 정렬한 스트림.
-     * UI에서 HIGH / MEDIUM / LOW 섹션으로 groupBy해 stickyHeader에 사용.
+     * 특정 날짜 범위에 완료된 할 일 스트림 — 아카이브 Day Selector 필터링.
+     * updatedAt 기준: isDone 전환 시 갱신되므로 완료 시각으로 취급.
      */
-    fun getSortedTasks(): Flow<List<TaskEntity>>
+    fun getCompletedTasksByDate(startOfDay: Long, endOfDay: Long): Flow<List<TaskEntity>>
 
     /** 단건 조회 */
     fun getTaskById(id: Long): Flow<TaskEntity?>
@@ -64,4 +58,7 @@ interface TaskRepository {
 
     /** 완료 항목 전체 삭제 */
     suspend fun deleteAllCompleted()
+
+    /** 특정 날짜 범위에 완료된 항목 삭제 */
+    suspend fun deleteCompletedByDate(startOfDay: Long, endOfDay: Long)
 }
