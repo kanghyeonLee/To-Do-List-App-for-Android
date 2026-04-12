@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ══════════════════════════════════════════════════════
+         권한 선언
+         ══════════════════════════════════════════════════════ -->
+
+    <!--
+        POST_NOTIFICATIONS (Android 13+ / API 33)
+        알림을 게시하려면 런타임 권한 요청 필요.
+        13 미만 기기에서는 자동 허용 (maxSdkVersion 설정 불필요).
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+        FOREGROUND_SERVICE (API 28+)
+        startForegroundService() 호출에 필수.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!--
+        FOREGROUND_SERVICE_DATA_SYNC (Android 14+ / API 34)
+        foregroundServiceType="dataSync" 사용 시 반드시 선언.
+        타입을 선언하지 않으면 API 34+에서 SecurityException 발생.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!--
+        RECEIVE_BOOT_COMPLETED
+        기기 부팅 후 BootReceiver를 통한 서비스 자동 시작에 필요.
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!--
+        WAKE_LOCK
+        잠금화면에서 알림 인터랙션 중 화면이 꺼지지 않도록 유지.
+        (선택 사항: Lock Screen Activity 방식 사용 시 필요)
+    -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- ══════════════════════════════════════════════════════
+         Application
+         ══════════════════════════════════════════════════════ -->
+
+    <application
+        android:name=".TodoApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@drawable/ic_todo_notification"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+        tools:targetApi="31">
+
+        <!-- ── 메인 액티비티 ──────────────────────────────── -->
+        <activity
+            android:name=".presentation.MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- ── Foreground Service ─────────────────────────────
+             exported="false"  : 외부 앱에서 직접 시작 불가 (보안)
+             foregroundServiceType: API 34+에서 필수 선언
+               - dataSync: 사용자 데이터를 로컬에서 지속적으로 처리하는 유형
+               - 잠금화면 알림 갱신 목적에 가장 적합
+        -->
+        <service
+            android:name=".service.TodoForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:stopWithTask="false" />
+        <!--
+            stopWithTask="false":
+            사용자가 앱을 최근 앱 목록에서 스와이프해 종료해도 서비스가 유지됨.
+            true로 설정하면 앱 종료 시 서비스도 함께 중단됨.
+        -->
+
+        <!-- ── BootReceiver ───────────────────────────────────
+             exported="true"   : 시스템 브로드캐스트를 수신하므로 필수
+             enabled="true"    : 기본값이지만 명시적으로 선언
+        -->
+        <receiver
+            android:name=".receiver.BootReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <!-- 완전 부팅 완료 -->
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <!--
+                    직접 부팅(Direct Boot) 완료 (Android 7.0+ / API 24+)
+                    기기가 잠긴 상태에서도 수신 가능.
+                    단, directBootAware="true" + Credential Encrypted Storage가 아닌
+                    Device Encrypted Storage를 사용해야 함.
+                -->
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ── TaskActionReceiver ─────────────────────────────
+             exported="false"  : PendingIntent를 통해서만 수신 (외부 접근 차단)
+             알림 버튼(완료/삭제) 클릭 시 이 Receiver가 호출됨.
+        -->
+        <receiver
+            android:name=".receiver.TaskActionReceiver"
+            android:exported="false" />
+
+    </application>
+
+</manifest>

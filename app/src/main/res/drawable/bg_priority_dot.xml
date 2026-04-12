@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    우선순위 표시 점 (알림 확장 뷰에서 사용)
+    HIGH 우선순위일 때만 VISIBLE 처리됨
+    android:tint 로 색상 재정의 가능
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#FFE53935" />
+    <size
+        android:width="8dp"
+        android:height="8dp" />
+</shape>
