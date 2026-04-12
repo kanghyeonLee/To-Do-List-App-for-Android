@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    색상 리소스
+    - notification_* : 알림 확장 뷰(RemoteViews)에서 사용
+    - 나머지         : Compose Theme의 폴백 / XML 레이아웃 공용
+
+    [다크모드 대응]
+    res/values-night/colors.xml 를 추가해 야간 색상을 별도 정의할 것
+    (RemoteViews는 Compose DynamicColor를 사용할 수 없으므로 XML 색상 필수)
+-->
+<resources>
+    <!-- 앱 테마 시드 색상 -->
+    <color name="todo_green">#FF2E7D32</color>
+    <color name="todo_green_container">#FFC8E6C9</color>
+    <color name="todo_surface">#FFFAFAFA</color>
+
+    <!-- 알림 확장 뷰 텍스트 -->
+    <color name="notification_text_primary">#FF1C1B1F</color>
+    <color name="notification_text_secondary">#FF49454F</color>
+
+    <!-- 알림 확장 뷰 구분선 -->
+    <color name="notification_divider">#1F000000</color>
+
+    <!-- 알림 액션 버튼(완료 체크) tint -->
+    <color name="notification_action_tint">#FF2E7D32</color>
+
+    <!-- 우선순위 색상 -->
+    <color name="priority_high">#FFE53935</color>
+    <color name="priority_medium">#FF1976D2</color>
+    <color name="priority_low">#FF757575</color>
+
+    <!-- 기한 초과 색상 -->
+    <color name="overdue_red">#FFFF5252</color>
+</resources>
