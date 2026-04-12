@@ -2,8 +2,8 @@ package com.kanghyeon.todolist.data.repository
 
 import com.kanghyeon.todolist.data.local.dao.TaskDao
 import com.kanghyeon.todolist.data.local.entity.TaskEntity
+import com.kanghyeon.todolist.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
@@ -38,7 +38,7 @@ import javax.inject.Singleton
 @Singleton
 class TaskRepositoryImpl @Inject constructor(
     private val dao: TaskDao,
-    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    @IoDispatcher private val dispatcher: CoroutineDispatcher,
 ) : TaskRepository {
 
     // ──────────────────────────────────────────
