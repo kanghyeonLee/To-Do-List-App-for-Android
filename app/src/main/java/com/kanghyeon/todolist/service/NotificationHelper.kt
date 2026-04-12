@@ -47,16 +47,43 @@ object NotificationHelper {
         R.id.slot_1_title,
         R.id.slot_2_title,
     )
-    private val SLOT_PRIORITY_DOTS = intArrayOf(
-        R.id.slot_0_priority,
-        R.id.slot_1_priority,
-        R.id.slot_2_priority,
+    private val SLOT_ACCENTS = intArrayOf(
+        R.id.slot_0_accent,
+        R.id.slot_1_accent,
+        R.id.slot_2_accent,
     )
     private val SLOT_DONE_BUTTONS = intArrayOf(
         R.id.slot_0_done_btn,
         R.id.slot_1_done_btn,
         R.id.slot_2_done_btn,
     )
+
+    // ── 우선순위별 색상 (ARGB Int) ────────────────────────────────
+    // RemoteViews는 Compose/Theme 색상을 사용할 수 없으므로 상수로 정의.
+
+    /** 슬롯 컨테이너 파스텔 배경색 (alpha ~10%) */
+    private fun priorityBgColor(priority: Int): Int = when (Priority.from(priority)) {
+        Priority.HIGH   -> 0x1AE53935.toInt()   // Red α≈10%
+        Priority.MEDIUM -> 0x1AFB8C00.toInt()   // Orange α≈10%
+        Priority.LOW    -> 0x0F9E9E9E.toInt()   // Grey α≈6%
+    }
+
+    /** 좌측 액센트 바 색상 (불투명) */
+    private fun priorityAccentColor(priority: Int): Int = when (Priority.from(priority)) {
+        Priority.HIGH   -> 0xFFE53935.toInt()
+        Priority.MEDIUM -> 0xFFFB8C00.toInt()
+        Priority.LOW    -> 0xFF9E9E9E.toInt()
+    }
+
+    /**
+     * 제목 텍스트 색상 — 파스텔 배경 위에서 가독성 확보
+     * 우선순위별 진한 색상 또는 near-black 사용
+     */
+    private fun priorityTextColor(priority: Int): Int = when (Priority.from(priority)) {
+        Priority.HIGH   -> 0xFFC62828.toInt()   // Red 800
+        Priority.MEDIUM -> 0xFFE65100.toInt()   // Orange 900
+        Priority.LOW    -> 0xFF212121.toInt()   // Grey 900 (near-black)
+    }
 
     // ──────────────────────────────────────────────────────
     // 채널 생성
@@ -177,16 +204,26 @@ object NotificationHelper {
             val task = tasks.getOrNull(i)
 
             if (task == null) {
-                // 해당 슬롯 숨김
                 views.setViewVisibility(SLOT_CONTAINERS[i], android.view.View.GONE)
             } else {
                 views.setViewVisibility(SLOT_CONTAINERS[i], android.view.View.VISIBLE)
-                views.setTextViewText(SLOT_TITLES[i], task.title)
 
-                // 우선순위 색상 (XML에서 tint로 표현하므로 visibility만 조정)
-                val priorityVisible = if (task.priority == Priority.HIGH.value)
-                    android.view.View.VISIBLE else android.view.View.GONE
-                views.setViewVisibility(SLOT_PRIORITY_DOTS[i], priorityVisible)
+                // ── 우선순위별 색상 적용 ──────────────────────
+                // 파스텔 배경 (컨테이너)
+                views.setInt(
+                    SLOT_CONTAINERS[i],
+                    "setBackgroundColor",
+                    priorityBgColor(task.priority),
+                )
+                // 좌측 액센트 바
+                views.setInt(
+                    SLOT_ACCENTS[i],
+                    "setBackgroundColor",
+                    priorityAccentColor(task.priority),
+                )
+                // 제목 텍스트 (파스텔 배경 위 가독성 확보)
+                views.setTextViewText(SLOT_TITLES[i], task.title)
+                views.setTextColor(SLOT_TITLES[i], priorityTextColor(task.priority))
 
                 // 완료 버튼 PendingIntent
                 val doneIntent = buildMarkDoneIntent(context, task.id, requestCode = i)

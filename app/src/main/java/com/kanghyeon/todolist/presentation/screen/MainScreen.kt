@@ -49,15 +49,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kanghyeon.todolist.data.local.entity.Priority
 import com.kanghyeon.todolist.data.local.entity.TaskEntity
 import com.kanghyeon.todolist.presentation.theme.OverdueRed
+import com.kanghyeon.todolist.presentation.theme.PriorityHigh
+import com.kanghyeon.todolist.presentation.theme.PriorityLow
+import com.kanghyeon.todolist.presentation.theme.PriorityMedium
 import com.kanghyeon.todolist.presentation.viewmodel.TaskEvent
 import com.kanghyeon.todolist.presentation.viewmodel.TaskUiState
 import com.kanghyeon.todolist.presentation.viewmodel.TaskViewModel
@@ -312,42 +315,44 @@ private fun AllContent(
         return
     }
 
-    // priority → (한국어 레이블, 강조 색상)
+    // priority → (레이블, 액센트 색상)
+    data class PriorityMeta(val label: String, val accent: Color)
     val priorityMeta = mapOf(
-        Priority.HIGH   to ("높음" to Color(0xFFE53935)),   // Red 600
-        Priority.MEDIUM to ("중간" to Color(0xFFFB8C00)),   // Orange 600
-        Priority.LOW    to ("낮음" to Color(0xFF757575)),   // Grey 600
+        Priority.HIGH   to PriorityMeta("높음", PriorityHigh),
+        Priority.MEDIUM to PriorityMeta("중간", PriorityMedium),
+        Priority.LOW    to PriorityMeta("낮음", PriorityLow),
     )
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // ── 중요도별 섹션 (HIGH → MEDIUM → LOW) ─────────────
+        // ── 중요도별 섹션 카드 (HIGH → MEDIUM → LOW) ─────────
         Priority.entries
-            .sortedByDescending { it.value }   // HIGH, MEDIUM, LOW 순
+            .sortedByDescending { it.value }
             .forEach { priority ->
                 val tasks = grouped[priority]
                 if (!tasks.isNullOrEmpty()) {
-                    val (label, dotColor) = priorityMeta.getValue(priority)
+                    val meta = priorityMeta.getValue(priority)
 
+                    // 섹션 헤더 (스크롤 시 상단 고정)
                     stickyHeader(key = "priority_header_${priority.name}") {
                         PrioritySectionHeader(
-                            label = label,
+                            label = meta.label,
                             count = tasks.size,
-                            dotColor = dotColor,
+                            dotColor = meta.accent,
                         )
                     }
 
-                    items(
-                        items = tasks,
-                        key = { "sorted_${it.id}" },
-                    ) { task ->
-                        TaskItem(
-                            task = task,
-                            onToggleDone = { viewModel.toggleDone(task.id, task.isDone) },
-                            onDelete = { viewModel.deleteTask(task) },
+                    // 해당 priority의 모든 Task를 하나의 ElevatedCard로 묶음
+                    item(key = "priority_card_${priority.name}") {
+                        PriorityGroupCard(
+                            tasks = tasks,
+                            accentColor = meta.accent,
+                            bgColor = MaterialTheme.colorScheme.surface,
+                            onToggleDone = { task -> viewModel.toggleDone(task.id, task.isDone) },
+                            onDelete = { task -> viewModel.deleteTask(task) },
                             modifier = Modifier.animateItem(),
                         )
                     }

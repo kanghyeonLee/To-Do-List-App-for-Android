@@ -24,10 +24,20 @@
     <!-- 알림 액션 버튼(완료 체크) tint -->
     <color name="notification_action_tint">#FF2E7D32</color>
 
-    <!-- 우선순위 색상 -->
+    <!-- 우선순위 색상 (액센트 바·dot 색상) -->
     <color name="priority_high">#FFE53935</color>
-    <color name="priority_medium">#FF1976D2</color>
-    <color name="priority_low">#FF757575</color>
+    <color name="priority_medium">#FFFB8C00</color>
+    <color name="priority_low">#FF9E9E9E</color>
+
+    <!-- 우선순위 파스텔 배경 (알림 슬롯 컨테이너 배경) -->
+    <color name="priority_high_bg">#1AE53935</color>
+    <color name="priority_medium_bg">#1AFB8C00</color>
+    <color name="priority_low_bg">#0F9E9E9E</color>
+
+    <!-- 우선순위 강조 텍스트 (파스텔 배경 위 가독성 확보) -->
+    <color name="priority_high_text">#FFC62828</color>
+    <color name="priority_medium_text">#FFE65100</color>
+    <color name="priority_low_text">#FF212121</color>
 
     <!-- 기한 초과 색상 -->
     <color name="overdue_red">#FFFF5252</color>
