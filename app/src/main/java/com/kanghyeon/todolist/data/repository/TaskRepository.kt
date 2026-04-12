@@ -35,6 +35,12 @@ interface TaskRepository {
     /** 완료된 할 일 스트림 */
     fun getCompletedTasks(): Flow<List<TaskEntity>>
 
+    /**
+     * 미완료 할 일을 priority DESC, createdAt DESC 순으로 정렬한 스트림.
+     * UI에서 HIGH / MEDIUM / LOW 섹션으로 groupBy해 stickyHeader에 사용.
+     */
+    fun getSortedTasks(): Flow<List<TaskEntity>>
+
     /** 단건 조회 */
     fun getTaskById(id: Long): Flow<TaskEntity?>
 

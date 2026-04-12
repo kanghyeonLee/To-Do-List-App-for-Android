@@ -69,6 +69,10 @@ class TaskRepositoryImpl @Inject constructor(
         dao.getCompletedTasks()
             .flowOn(dispatcher)
 
+    override fun getSortedTasks(): Flow<List<TaskEntity>> =
+        dao.getSortedTasks()
+            .flowOn(dispatcher)
+
     override fun getTaskById(id: Long): Flow<TaskEntity?> =
         dao.getTaskById(id)
             .flowOn(dispatcher)

@@ -96,6 +96,25 @@ interface TaskDao {
     )
     fun getCompletedTasks(): Flow<List<TaskEntity>>
 
+    /**
+     * 중요도 섹션 정렬용 쿼리
+     *
+     * 조건: 미완료 항목만 (isDone = 0)
+     * 정렬: priority DESC (HIGH=2 → MEDIUM=1 → LOW=0)
+     *       → 동일 priority 내에서 createdAt DESC (최근 생성 순)
+     *
+     * UI의 LazyColumn stickyHeader 섹션 분리에 사용.
+     * groupBy는 ViewModel/UI 레이어에서 처리한다.
+     */
+    @Query(
+        """
+        SELECT * FROM tasks
+        WHERE isDone = 0
+        ORDER BY priority DESC, createdAt DESC
+        """
+    )
+    fun getSortedTasks(): Flow<List<TaskEntity>>
+
     // ──────────────────────────────────────────
     // WRITE
     // ──────────────────────────────────────────
