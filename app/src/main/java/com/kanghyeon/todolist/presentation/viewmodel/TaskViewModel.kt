@@ -1,12 +1,17 @@
 package com.kanghyeon.todolist.presentation.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kanghyeon.todolist.data.local.entity.Priority
+import com.kanghyeon.todolist.data.local.entity.RoutineTemplateGroupWithTasks
+import com.kanghyeon.todolist.data.local.entity.RoutineTemplateTaskEntity
 import com.kanghyeon.todolist.data.local.entity.TaskEntity
+import com.kanghyeon.todolist.data.repository.RoutineTemplateRepository
 import com.kanghyeon.todolist.data.repository.TaskRepository
 import com.kanghyeon.todolist.service.AlarmScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -99,8 +104,29 @@ sealed interface TaskEvent {
 @HiltViewModel
 class TaskViewModel @Inject constructor(
     private val repository: TaskRepository,
+    private val templateRepository: RoutineTemplateRepository,
     private val alarmScheduler: AlarmScheduler,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
+
+    // ── SharedPreferences — 루틴 마지막 생성 날짜 ─────────────────
+    private val routinePrefs by lazy {
+        context.getSharedPreferences("routine_prefs", Context.MODE_PRIVATE)
+    }
+
+    // ── 루틴 템플릿 그룹 목록 (그룹 + 소속 할 일) ───────────────────
+    val templateGroups: StateFlow<List<RoutineTemplateGroupWithTasks>> =
+        templateRepository.getAllGroupsWithTasks()
+            .stateIn(
+                scope        = viewModelScope,
+                started      = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptyList(),
+            )
+
+    // ── 앱 시작 시 오늘 루틴 자동 생성 ──────────────────────────
+    init {
+        generateDailyRoutines()
+    }
 
     // ── UI State ─────────────────────────────────────────
     /**
@@ -462,6 +488,124 @@ class TaskViewModel @Inject constructor(
     }
 
     // ──────────────────────────────────────────────────────
+    // 루틴 템플릿 그룹 CRUD
+    // ──────────────────────────────────────────────────────
+
+    /** 새 그룹 생성 */
+    fun addTemplateGroup(name: String) {
+        if (name.isBlank()) {
+            emitEvent(TaskEvent.ShowMessage("그룹 이름을 입력해 주세요."))
+            return
+        }
+        viewModelScope.launch {
+            templateRepository.addGroup(name.trim())
+        }
+    }
+
+    /** 그룹 활성화/비활성화 토글 */
+    fun toggleTemplateGroupActive(id: Long, isActive: Boolean) {
+        viewModelScope.launch {
+            templateRepository.updateGroupActiveState(id, isActive)
+        }
+    }
+
+    /** 그룹명 변경 */
+    fun renameTemplateGroup(id: Long, name: String) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            templateRepository.updateGroupName(id, name.trim())
+        }
+    }
+
+    /** 그룹 삭제 (소속 할 일 CASCADE 삭제) */
+    fun deleteTemplateGroup(id: Long) {
+        viewModelScope.launch {
+            templateRepository.deleteGroup(id)
+        }
+    }
+
+    // ──────────────────────────────────────────────────────
+    // 루틴 템플릿 할 일 CRUD
+    // ──────────────────────────────────────────────────────
+
+    /** 그룹에 할 일 추가 */
+    fun addTemplateTask(
+        groupId: Long,
+        title: String,
+        description: String? = null,
+        priority: Int = Priority.MEDIUM.value,
+        showOnLockScreen: Boolean = true,
+    ) {
+        if (title.isBlank()) {
+            emitEvent(TaskEvent.ShowMessage("제목을 입력해 주세요."))
+            return
+        }
+        viewModelScope.launch {
+            templateRepository.addTask(
+                RoutineTemplateTaskEntity(
+                    groupId          = groupId,
+                    title            = title.trim(),
+                    description      = description?.trim(),
+                    priority         = priority,
+                    showOnLockScreen = showOnLockScreen,
+                )
+            )
+        }
+    }
+
+    /** 할 일 단건 삭제 */
+    fun deleteTemplateTask(id: Long) {
+        viewModelScope.launch {
+            templateRepository.deleteTask(id)
+        }
+    }
+
+    // ──────────────────────────────────────────────────────
+    // 루틴 자동 생성 (하루 1회, isActive 그룹만)
+    // ──────────────────────────────────────────────────────
+
+    /**
+     * 앱 시작 시 오늘 날짜를 확인하고, 아직 루틴이 생성되지 않았으면
+     * isActive == true 인 그룹의 할 일들을 TaskEntity로 복사한다.
+     *
+     * - 중복 방지: SharedPreferences의 last_routine_date 가 오늘이면 즉시 반환
+     * - 비활성 그룹 제외: getActiveGroupsWithTasksOnce()로 isActive=1만 조회
+     * - 날짜 기록: 템플릿이 없어도 오늘 날짜를 저장해 불필요한 재진입을 방지
+     */
+    private fun generateDailyRoutines() {
+        viewModelScope.launch {
+            val today = LocalDate.now().toString()   // "yyyy-MM-dd"
+            val lastDate = routinePrefs.getString(PREF_KEY_LAST_ROUTINE_DATE, null)
+            if (lastDate == today) return@launch
+
+            val activeGroups = templateRepository.getActiveGroupsWithTasksOnce()
+            var taskCount = 0
+
+            activeGroups.forEach { groupWithTasks ->
+                groupWithTasks.tasks.forEach { templateTask ->
+                    repository.saveTask(
+                        TaskEntity(
+                            title            = templateTask.title,
+                            description      = templateTask.description,
+                            priority         = templateTask.priority,
+                            showOnLockScreen = templateTask.showOnLockScreen,
+                        )
+                    )
+                    taskCount++
+                }
+            }
+
+            routinePrefs.edit()
+                .putString(PREF_KEY_LAST_ROUTINE_DATE, today)
+                .apply()
+
+            if (taskCount > 0) {
+                emitEvent(TaskEvent.ShowMessage("루틴 ${taskCount}개가 오늘의 할 일에 추가됐습니다."))
+            }
+        }
+    }
+
+    // ──────────────────────────────────────────────────────
     // 내부 헬퍼
     // ──────────────────────────────────────────────────────
 
@@ -471,6 +615,7 @@ class TaskViewModel @Inject constructor(
 
     companion object {
         private const val DAY_MS = 24 * 60 * 60 * 1_000L
+        private const val PREF_KEY_LAST_ROUTINE_DATE = "last_routine_date"
 
         /** 오늘 00:00:00.000 epoch ms (로컬 타임존 기준) */
         fun todayStartMs(): Long =

@@ -117,8 +117,9 @@ fun MainScreen(
     var showTrashScreen      by remember { mutableStateOf(false) }
     var selectedTab          by remember { mutableIntStateOf(0) }
     // 아카이브 일괄 삭제 확인 다이얼로그 표시 여부
-    var showBulkDeleteConfirm by remember { mutableStateOf(false) }
-    var showSyncConfirm by remember { mutableStateOf(false) }
+    var showBulkDeleteConfirm    by remember { mutableStateOf(false) }
+    var showSyncConfirm          by remember { mutableStateOf(false) }
+    var showTemplateManage       by remember { mutableStateOf(false) }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -160,6 +161,16 @@ fun MainScreen(
                     )
                 },
                 actions = {
+                    // 루틴 템플릿 관리
+                    IconButton(onClick = { showTemplateManage = true }) {
+                        Icon(
+                            painter            = painterResource(R.drawable.layout_panel_top),
+                            contentDescription = "루틴 템플릿 관리",
+                            tint               = Color(0xFF6B7280),
+                            modifier           = Modifier.size(22.dp),
+                        )
+                    }
+
                     IconButton(onClick = { showTrashScreen = true }) {
                         Icon(
                             painter            = painterResource(R.drawable.trash_2),
@@ -409,6 +420,14 @@ fun MainScreen(
         TrashScreen(
             viewModel = viewModel,
             onBack    = { showTrashScreen = false },
+        )
+    }
+
+    // ── 루틴 템플릿 관리 BottomSheet ──────────────────────────────
+    if (showTemplateManage) {
+        TemplateManageBottomSheet(
+            viewModel = viewModel,
+            onDismiss = { showTemplateManage = false },
         )
     }
 
