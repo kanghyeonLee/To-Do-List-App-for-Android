@@ -63,7 +63,11 @@ data class NewTaskDraft(
  * - '아카이브' 탭: completedTasks — 배지 카운트 전용 (날짜 필터링은 archiveTasks StateFlow 사용)
  */
 data class TaskUiState(
-    /** 전체 미완료 할 일 (priority DESC, createdAt DESC) — '할 일' 탭 표시용 */
+    /** * 메인 '할 일' 탭 표시용 목록.
+     * - 아직 완료되지 않은 항목(isDone=false) 전체
+     * - 오늘 완료된 항목(isDone=true && updatedAt >= 오늘자정) 포함
+     * 정렬: 미완료 우선 -> 우선순위 높은 순 -> 최신순
+     */
     val activeTasks: List<TaskEntity> = emptyList(),
     /** 완료된 할 일 전체 — '아카이브' 탭 배지 카운트용 */
     val completedTasks: List<TaskEntity> = emptyList(),
@@ -110,8 +114,17 @@ class TaskViewModel @Inject constructor(
         repository.getActiveTasks(),
         repository.getCompletedTasks(),
     ) { active, completed ->
+        val todayStart = todayStartMs()
+
+        val completedToday = completed.filter { it.updatedAt >= todayStart }
+
+        val mainTasks = (active + completedToday).sortedWith(
+            compareBy<TaskEntity> { it.isDone } 
+                .thenByDescending { it.priority }
+                .thenByDescending { it.createdAt }
+        )
         TaskUiState(
-            activeTasks    = active,
+            activeTasks    = mainTasks,
             completedTasks = completed,
             isLoading      = false,
         )
@@ -132,15 +145,24 @@ class TaskViewModel @Inject constructor(
     /**
      * 선택된 날짜에 완료된 할 일 목록 (updatedAt 기준, DESC 정렬).
      *
-     * flatMapLatest: _selectedArchiveDate가 바뀌면 이전 구독을 즉시 취소하고
-     * 새 날짜 쿼리로 재구독 → 날짜 전환 시 이전 데이터 잔류 없음.
+     * [아카이브 정책 변경: 당일 이관 유예]
+     * - '오늘' 완료한 항목은 메인 탭(activeTasks)에 계속 노출되므로, 아카이브 탭과의 중복을 방지하기 위해 
+     * 선택된 날짜가 오늘(todayStartMs)이거나 그 이후인 경우 빈 리스트를 반환한다.
+     * - 자정이 지나 '어제'가 된 항목들부터 이 목록에 포함되어 아카이브 탭에 나타난다.
+     *
+     * flatMapLatest: 날짜가 바뀌면 즉시 이전 쿼리를 취소하고 새 날짜로 재구독한다.
      */
     val archiveTasks: StateFlow<List<TaskEntity>> = _selectedArchiveDate
         .flatMapLatest { startMs ->
-            repository.getCompletedTasksByDate(
-                startOfDay = startMs,
-                endOfDay   = startMs + DAY_MS - 1,
-            )
+            val todayStart = todayStartMs()
+            if (startMs >= todayStart) {
+                kotlinx.coroutines.flow.flowOf(emptyList())
+            } else {
+                repository.getCompletedTasksByDate(
+                    startOfDay = startMs,
+                    endOfDay   = startMs + DAY_MS - 1,
+                )
+            }
         }
         .stateIn(
             scope        = viewModelScope,
@@ -271,17 +293,10 @@ class TaskViewModel @Inject constructor(
     }
 
     /**
-     * 완료/미완료 토글 — Task 전체를 받아 알람까지 일괄 처리.
-     *
-     * - 완료 전환 (isDone false → true):
-     *   1. DB isDone = true, updatedAt 갱신 → Room Flow가 자동으로
-     *      activeTasks에서 제거, completedTasks/archiveTasks에 추가
-     *   2. 예약된 알람 취소
-     *
-     * - 미완료 복구 (isDone true → false):
-     *   1. DB isDone = false → 할 일 목록으로 즉시 복귀
-     *   2. dueDate가 현재+5분 이후면 알람 재예약
-     *      (AlarmScheduler.schedule 내부에서 과거 시각은 자동으로 무시)
+     * 완료/미완료 토글 핸들러.
+     * * [UX 개선] 
+     * 완료(isDone=true) 처리되어도 즉시 아카이브로 이동하지 않고, 
+     * 뷰모델의 필터링 로직에 의해 당일 동안은 메인 화면에 취소선 상태로 유지.
      */
     fun toggleTaskCompletion(task: TaskEntity) {
         viewModelScope.launch {

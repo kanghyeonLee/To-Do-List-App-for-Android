@@ -240,9 +240,10 @@ fun MainScreen(
                     selected = selectedTab == 0,
                     onClick  = { selectedTab = 0 },
                     text     = {
-                        val count = uiState.activeTasks.size
+                        val totalCount = uiState.activeTasks.size
+                        val completedCount = uiState.activeTasks.count { it.isDone }                            
                         Text(
-                            text  = if (count > 0) "할 일 ($count)" else "할 일",
+                            text  = "할 일 ($completedCount / $totalCount)",
                             color = if (selectedTab == 0) MaterialTheme.colorScheme.primary
                                     else Color(0xFF6B7280),
                             style = MaterialTheme.typography.labelLarge.copy(
