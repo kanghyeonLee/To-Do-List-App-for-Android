@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -156,7 +157,11 @@ class TaskViewModel @Inject constructor(
         .flatMapLatest { startMs ->
             val todayStart = todayStartMs()
             if (startMs >= todayStart) {
-                kotlinx.coroutines.flow.flowOf(emptyList())
+                repository.getCompletedTasks().map { completedList ->
+                    completedList.filter { 
+                        it.isArchived && it.updatedAt >= startMs && it.updatedAt < startMs + DAY_MS 
+                    }
+                }
             } else {
                 repository.getCompletedTasksByDate(
                     startOfDay = startMs,
@@ -424,6 +429,35 @@ class TaskViewModel @Inject constructor(
         viewModelScope.launch {
             val orders = reorderedList.mapIndexed { index, task -> task.id to index }
             repository.updateSortOrders(orders)
+        }
+    }
+
+    /**
+     * 오늘 완료된 항목을 아카이브로 수동 동기화 (즉시 기록).
+     *
+     * [UX 개선: 수동 아카이브]
+     * - 기본적으로 완료 항목은 자정이 지나야 아카이브로 이동하지만,
+     * 사용자가 원할 때 즉시 'isArchived = true'로 변경하여 아카이브에 기록.
+     * - 동기화 후에도 당일 동안은 메인 화면(activeTasks)에 계속 유지된다.
+     */
+    fun syncCompletedTasksToArchive() {
+        viewModelScope.launch {
+            val todayStart = todayStartMs()
+            
+            val targetsToSync = uiState.value.activeTasks.filter { task ->
+                task.isDone && !task.isArchived && task.updatedAt >= todayStart
+            }
+            
+            if (targetsToSync.isEmpty()) {
+                emitEvent(TaskEvent.ShowMessage("새롭게 동기화할 완료 항목이 없습니다."))
+                return@launch
+            }
+
+            targetsToSync.forEach { task ->
+                repository.updateTask(task.copy(isArchived = true))
+            }
+            
+            emitEvent(TaskEvent.ShowMessage("${targetsToSync.size}개의 할 일을 아카이브에 기록했습니다."))
         }
     }
 

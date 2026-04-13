@@ -118,6 +118,7 @@ fun MainScreen(
     var selectedTab          by remember { mutableIntStateOf(0) }
     // 아카이브 일괄 삭제 확인 다이얼로그 표시 여부
     var showBulkDeleteConfirm by remember { mutableStateOf(false) }
+    var showSyncConfirm by remember { mutableStateOf(false) }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -167,6 +168,18 @@ fun MainScreen(
                             modifier           = Modifier.size(22.dp),
                         )
                     }
+
+                    if (selectedTab == 0) {
+                        IconButton(onClick = { showSyncConfirm = true }) {
+                            Icon(
+                                painter            = painterResource(R.drawable.archive_restore), 
+                                contentDescription = "아카이브 수동 동기화",
+                                tint               = MaterialTheme.colorScheme.primary,
+                                modifier           = Modifier.size(22.dp),
+                            )
+                        }
+                    }
+
                     // 아카이브 탭에 항목이 있을 때만 일괄 삭제 버튼 표시
                     if (selectedTab == 1 && archiveTasks.isNotEmpty()) {
                         IconButton(onClick = { showBulkDeleteConfirm = true }) {
@@ -177,6 +190,59 @@ fun MainScreen(
                                 modifier           = Modifier.size(22.dp),
                             )
                         }
+                    }
+                    if (showSyncConfirm) {
+                        AlertDialog(
+                            onDismissRequest = { showSyncConfirm = false },
+                            icon = {
+                                Icon(
+                                    painter            = painterResource(R.drawable.archive_restore),
+                                    contentDescription = null,
+                                    tint               = MaterialTheme.colorScheme.primary,
+                                    modifier           = Modifier.size(28.dp),
+                                )
+                            },
+                            title = {
+                                Text(
+                                    text  = "아카이브 수동 동기화",
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color      = Color(0xFF1D1D1F),
+                                    ),
+                                )
+                            },
+                            text = {
+                                Text(
+                                    text  = "오늘 완료한 할 일들을 지금 바로 아카이브에 기록하시겠습니까?\n\n(기록 후에도 자정 전까지는 메인 화면에 계속 유지됩니다.)",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = Color(0xFF6B7280),
+                                    ),
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        viewModel.syncCompletedTasksToArchive()
+                                        showSyncConfirm = false
+                                    },
+                                ) {
+                                    Text(
+                                        text  = "동기화",
+                                        color = MaterialTheme.colorScheme.primary,
+                                        style = MaterialTheme.typography.labelLarge.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                        ),
+                                    )
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showSyncConfirm = false }) {
+                                    Text("취소", color = Color(0xFF6B7280))
+                                }
+                            },
+                            shape = RoundedCornerShape(16.dp),
+                            containerColor = MaterialTheme.colorScheme.surface,
+                        )
                     }
                 },
                 scrollBehavior = scrollBehavior,
