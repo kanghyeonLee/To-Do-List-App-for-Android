@@ -1,10 +1,14 @@
 package com.kanghyeon.todolist.presentation.screen
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +25,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -34,9 +37,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -44,6 +50,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kanghyeon.todolist.R
 import com.kanghyeon.todolist.data.local.entity.TaskEntity
+import com.kanghyeon.todolist.presentation.theme.ArchiveCardBg
+import com.kanghyeon.todolist.presentation.theme.CardBorderColor
 import com.kanghyeon.todolist.presentation.theme.OverdueRed
 import com.kanghyeon.todolist.presentation.theme.SwipeDeleteBackground
 import java.text.SimpleDateFormat
@@ -51,15 +59,12 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 단일 할 일 카드 컴포저블 (아카이브 탭 등 독립 사용)
- *
- * [레이아웃]
- * Row: [제목 + 부가정보 (left, weight 1f)] [체크 버튼 (right)]
+ * 단일 할 일 카드 컴포저블 (아카이브 탭 독립 사용)
  *
  * [디자인 원칙]
- * - 20dp 코너, 0dp elevation, 테두리 없음
- * - 제목: titleMedium SemiBold
- * - 체크 아이콘을 오른쪽에 배치해 완료 토글
+ * - 16dp 코너, 0dp elevation, 1dp 연회색 테두리
+ * - 완료 항목: 아주 연한 파란색(#E3F2FD) 배경
+ * - 체크박스: 커스텀 원형 — unchecked=회색 테두리, checked=딥 인디고 채움 + 흰 체크
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,28 +86,22 @@ fun TaskItem(
         },
     )
 
-    val checkColor by animateColorAsState(
-        targetValue = if (task.isDone) MaterialTheme.colorScheme.primary else Color(0xFFBDBDBD),
-        animationSpec = tween(durationMillis = 300),
-        label = "checkColor",
-    )
     val titleAlpha by animateFloatAsState(
-        targetValue = if (task.isDone) 0.4f else 1f,
-        animationSpec = tween(durationMillis = 300),
-        label = "titleAlpha",
+        targetValue    = if (task.isDone) 0.4f else 1f,
+        animationSpec  = tween(durationMillis = 300),
+        label          = "titleAlpha",
     )
 
     SwipeToDismissBox(
-        state = swipeState,
-        modifier = modifier,
+        state                      = swipeState,
+        modifier                   = modifier,
         enableDismissFromStartToEnd = false,
         enableDismissFromEndToStart = true,
-        backgroundContent = { SwipeDeleteBg() },
+        backgroundContent          = { SwipeDeleteBg() },
     ) {
         TaskCard(
-            task = task,
-            checkColor = checkColor,
-            titleAlpha = titleAlpha,
+            task         = task,
+            titleAlpha   = titleAlpha,
             onToggleDone = onToggleDone,
         )
     }
@@ -111,18 +110,19 @@ fun TaskItem(
 @Composable
 private fun TaskCard(
     task: TaskEntity,
-    checkColor: Color,
     titleAlpha: Float,
     onToggleDone: () -> Unit,
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, CardBorderColor, RoundedCornerShape(16.dp)),
+        shape  = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (task.isDone)
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            else
-                MaterialTheme.colorScheme.surface,
+            // 완료 항목 → 아주 연한 파란색, 미완료 → 흰색
+            containerColor = if (task.isDone) ArchiveCardBg else MaterialTheme.colorScheme.surface,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
@@ -132,103 +132,182 @@ private fun TaskCard(
                 .padding(start = 20.dp, end = 8.dp, top = 16.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // ── 제목 + 부가 정보 (LEFT) ───────────────────────
+            // ── 제목 + 부가 정보 ──────────────────────────────
             Column(
-                modifier = Modifier.weight(1f),
+                modifier            = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
-                    text = task.title,
+                    text  = task.title,
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = titleAlpha),
-                        textDecoration = if (task.isDone) TextDecoration.LineThrough else TextDecoration.None,
+                        fontWeight     = FontWeight.SemiBold,
+                        color          = Color(0xFF1D1D1F).copy(alpha = titleAlpha),
+                        textDecoration = if (task.isDone) TextDecoration.LineThrough
+                                         else TextDecoration.None,
                     ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                    maxLines  = 2,
+                    overflow  = TextOverflow.Ellipsis,
                 )
-
                 if (!task.description.isNullOrBlank()) {
                     Text(
-                        text = task.description,
+                        text  = task.description,
                         style = MaterialTheme.typography.bodySmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = titleAlpha),
+                            color = Color(0xFF6B7280).copy(alpha = titleAlpha),
                         ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-
                 task.dueDate?.let { DueDateChip(dueDate = it) }
             }
 
-            // ── 체크 버튼 (RIGHT) ─────────────────────────────
-            val scale by animateFloatAsState(
-                targetValue = if (task.isDone) 1.1f else 1f,
-                animationSpec = tween(200),
-                label = "iconScale",
+            // ── 원형 체크박스 ─────────────────────────────────
+            CircularCheckbox(
+                checked   = task.isDone,
+                onClick   = onToggleDone,
+                primary   = primaryColor,
+                modifier  = Modifier.padding(horizontal = 4.dp),
             )
-            IconButton(
-                onClick = onToggleDone,
-                modifier = Modifier.size(48.dp),
-            ) {
-                Icon(
-                    painter = painterResource(
-                        if (task.isDone) R.drawable.ic_check_circle_filled
-                        else R.drawable.ic_check_circle_outline
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 원형 체크박스 — 커스텀 Canvas 구현
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * 안드로이드 표준 원형 체크박스.
+ * - unchecked : 회색(#D1D5DB) 원형 테두리만
+ * - checked   : [primary] 색으로 원 채움 + 흰색 체크마크 (애니메이션)
+ *
+ * 48dp 터치 영역 확보 후 중앙에 24dp 원을 그린다.
+ */
+@Composable
+private fun CircularCheckbox(
+    checked: Boolean,
+    onClick: () -> Unit,
+    primary: Color,
+    modifier: Modifier = Modifier,
+) {
+    val progress by animateFloatAsState(
+        targetValue   = if (checked) 1f else 0f,
+        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
+        label         = "checkProgress",
+    )
+    val scale by animateFloatAsState(
+        targetValue   = if (checked) 1.08f else 1f,
+        animationSpec = tween(durationMillis = 200),
+        label         = "checkScale",
+    )
+    val uncheckedBorder = Color(0xFFD1D5DB)
+
+    Box(
+        modifier = modifier
+            .size(48.dp)
+            .clickable(
+                onClick            = onClick,
+                indication         = null,
+                interactionSource  = remember { MutableInteractionSource() },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(
+            modifier = Modifier
+                .size(24.dp)
+                .scale(scale),
+        ) {
+            val r          = size.minDimension / 2f
+            val strokePx   = 2.dp.toPx()
+
+            // 채움 원 (checked 시 primary 색, 애니메이션)
+            if (progress > 0f) {
+                drawCircle(
+                    color  = primary.copy(alpha = progress),
+                    radius = r,
+                )
+            }
+
+            // 테두리 원
+            drawCircle(
+                color  = if (checked) primary else uncheckedBorder,
+                radius = r - strokePx / 2f,
+                style  = Stroke(width = strokePx),
+            )
+
+            // 체크마크 (progress > 0.3f 이후 fade-in)
+            if (progress > 0.3f) {
+                val w      = size.width
+                val h      = size.height
+                val alpha  = ((progress - 0.3f) / 0.7f).coerceIn(0f, 1f)
+
+                val checkPath = Path().apply {
+                    moveTo(w * 0.22f, h * 0.52f)
+                    lineTo(w * 0.43f, h * 0.70f)
+                    lineTo(w * 0.78f, h * 0.33f)
+                }
+                drawPath(
+                    path  = checkPath,
+                    color = Color.White.copy(alpha = alpha),
+                    style = Stroke(
+                        width = 2.5.dp.toPx(),
+                        cap   = StrokeCap.Round,
+                        join  = StrokeJoin.Round,
                     ),
-                    contentDescription = if (task.isDone) "완료 취소" else "완료",
-                    tint = checkColor,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .scale(scale),
                 )
             }
         }
     }
 }
 
+// ══════════════════════════════════════════════════════════════════
+// DueDateChip
+// ══════════════════════════════════════════════════════════════════
+
 @Composable
 private fun DueDateChip(dueDate: Long) {
-    val now = System.currentTimeMillis()
+    val now      = System.currentTimeMillis()
     val isOverdue = dueDate < now
-    val label = remember(dueDate) {
+    val label    = remember(dueDate) {
         SimpleDateFormat("a h:mm", Locale.KOREA).format(Date(dueDate))
     }
 
     Row(
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Icon(
-            painter = painterResource(R.drawable.clock),
+            painter            = painterResource(R.drawable.clock),
             contentDescription = null,
-            tint = if (isOverdue) OverdueRed else MaterialTheme.colorScheme.outline,
-            modifier = Modifier.size(11.dp),
+            tint               = if (isOverdue) OverdueRed else Color(0xFF6B7280),
+            modifier           = Modifier.size(11.dp),
         )
         Text(
-            text = if (isOverdue) "$label 기한 초과" else label,
+            text  = if (isOverdue) "$label 기한 초과" else label,
             style = MaterialTheme.typography.labelSmall,
-            color = if (isOverdue) OverdueRed else MaterialTheme.colorScheme.outline,
+            color = if (isOverdue) OverdueRed else Color(0xFF6B7280),
         )
     }
 }
+
+// ══════════════════════════════════════════════════════════════════
+// SwipeDeleteBg
+// ══════════════════════════════════════════════════════════════════
 
 @Composable
 private fun SwipeDeleteBg() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(20.dp))
-            .background(SwipeDeleteBackground)
+            .background(SwipeDeleteBackground, RoundedCornerShape(16.dp))
             .padding(end = 20.dp),
         contentAlignment = Alignment.CenterEnd,
     ) {
         Icon(
-            painter = painterResource(R.drawable.trash_2),
+            painter            = painterResource(R.drawable.trash_2),
             contentDescription = "삭제",
-            tint = Color.White,
-            modifier = Modifier.size(22.dp),
+            tint               = Color.White,
+            modifier           = Modifier.size(22.dp),
         )
     }
 }
@@ -241,11 +320,11 @@ private fun SwipeDeleteBg() {
  * 동일 우선순위 Task 목록을 하나의 Card로 묶어 보여준다.
  *
  * [시각 구조]
- * Card (20dp 코너, 테두리 없음)
- *   ├── 4dp 좌측 액센트 바
+ * Card (16dp 코너, 1dp 연회색 테두리, 0dp elevation)
+ *   ├── 4dp 좌측 액센트 바 (priority color)
  *   └── Column
- *         ├── GroupedTaskRow(task0) — [제목+메타 left] [체크 right]
- *         ├── HorizontalDivider
+ *         ├── GroupedTaskRow(task0) — [제목+메타 left] [원형 체크박스 right]
+ *         ├── HorizontalDivider (액센트 컬러 12% opacity)
  *         └── GroupedTaskRow(task1) ...
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -260,9 +339,11 @@ fun PriorityGroupCard(
     modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor),
+        modifier = modifier
+            .fillMaxWidth()
+            .border(1.dp, CardBorderColor, RoundedCornerShape(16.dp)),
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(containerColor = bgColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row {
@@ -277,14 +358,15 @@ fun PriorityGroupCard(
             Column(modifier = Modifier.weight(1f)) {
                 tasks.forEachIndexed { index, task ->
                     GroupedTaskRow(
-                        task = task,
+                        task         = task,
+                        accentColor  = accentColor,
                         onToggleDone = { onToggleDone(task) },
-                        onDelete = { onDelete(task) },
-                        onEdit = { onEdit(task) },
+                        onDelete     = { onDelete(task) },
+                        onEdit       = { onEdit(task) },
                     )
                     if (index < tasks.lastIndex) {
                         HorizontalDivider(
-                            color = accentColor.copy(alpha = 0.12f),
+                            color     = accentColor.copy(alpha = 0.12f),
                             thickness = 1.dp,
                         )
                     }
@@ -298,6 +380,7 @@ fun PriorityGroupCard(
 @Composable
 private fun GroupedTaskRow(
     task: TaskEntity,
+    accentColor: Color,
     onToggleDone: () -> Unit,
     onDelete: () -> Unit,
     onEdit: () -> Unit,
@@ -314,22 +397,19 @@ private fun GroupedTaskRow(
         },
     )
 
-    val checkColor by animateColorAsState(
-        targetValue = if (task.isDone) MaterialTheme.colorScheme.primary else Color(0xFFBDBDBD),
-        animationSpec = tween(300),
-        label = "groupedCheckColor",
-    )
     val titleAlpha by animateFloatAsState(
-        targetValue = if (task.isDone) 0.4f else 1f,
+        targetValue   = if (task.isDone) 0.4f else 1f,
         animationSpec = tween(300),
-        label = "groupedTitleAlpha",
+        label         = "groupedTitleAlpha",
     )
+    val primaryColor = MaterialTheme.colorScheme.primary
 
     SwipeToDismissBox(
-        state = swipeState,
+        state                      = swipeState,
         enableDismissFromStartToEnd = false,
         enableDismissFromEndToStart = true,
         backgroundContent = {
+            // 카드 내부이므로 별도 코너 불필요 — 부모 Card가 클리핑
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -338,10 +418,10 @@ private fun GroupedTaskRow(
                 contentAlignment = Alignment.CenterEnd,
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.trash_2),
+                    painter            = painterResource(R.drawable.trash_2),
                     contentDescription = "삭제",
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp),
+                    tint               = Color.White,
+                    modifier           = Modifier.size(22.dp),
                 )
             }
         },
@@ -354,26 +434,27 @@ private fun GroupedTaskRow(
                 .padding(start = 20.dp, end = 8.dp, top = 16.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // ── 제목 + 부가 정보 (LEFT) ───────────────────────
+            // ── 제목 + 부가 정보 ──────────────────────────────
             Column(
-                modifier = Modifier.weight(1f),
+                modifier            = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
-                    text = task.title,
+                    text  = task.title,
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = titleAlpha),
-                        textDecoration = if (task.isDone) TextDecoration.LineThrough else TextDecoration.None,
+                        fontWeight     = FontWeight.SemiBold,
+                        color          = Color(0xFF1D1D1F).copy(alpha = titleAlpha),
+                        textDecoration = if (task.isDone) TextDecoration.LineThrough
+                                         else TextDecoration.None,
                     ),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (!task.description.isNullOrBlank()) {
                     Text(
-                        text = task.description,
+                        text  = task.description,
                         style = MaterialTheme.typography.bodySmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = titleAlpha),
+                            color = Color(0xFF6B7280).copy(alpha = titleAlpha),
                         ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -382,28 +463,13 @@ private fun GroupedTaskRow(
                 task.dueDate?.let { DueDateChip(it) }
             }
 
-            // ── 체크 버튼 (RIGHT) ─────────────────────────────
-            val scale by animateFloatAsState(
-                targetValue = if (task.isDone) 1.1f else 1f,
-                animationSpec = tween(200),
-                label = "groupedIconScale",
+            // ── 원형 체크박스 ─────────────────────────────────
+            CircularCheckbox(
+                checked  = task.isDone,
+                onClick  = onToggleDone,
+                primary  = primaryColor,
+                modifier = Modifier.padding(horizontal = 4.dp),
             )
-            IconButton(
-                onClick = onToggleDone,
-                modifier = Modifier.size(48.dp),
-            ) {
-                Icon(
-                    painter = painterResource(
-                        if (task.isDone) R.drawable.ic_check_circle_filled
-                        else R.drawable.ic_check_circle_outline
-                    ),
-                    contentDescription = if (task.isDone) "완료 취소" else "완료",
-                    tint = checkColor,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .scale(scale),
-                )
-            }
         }
     }
 }

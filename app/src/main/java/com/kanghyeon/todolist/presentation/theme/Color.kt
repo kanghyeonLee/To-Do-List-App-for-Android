@@ -38,5 +38,11 @@ val PriorityLowDark    = Color(0xFF6B7280)   // Gray 500
 val OverdueRed          = Color(0xFFEF4444)
 val OverdueRedContainer = Color(0xFFFEF2F2)
 
+// ── 아카이브 카드 배경 ────────────────────────────────────────────
+val ArchiveCardBg = Color(0xFFE3F2FD)   // 아주 연한 파란색 (완료 항목 카드)
+
+// ── 카드 테두리 ───────────────────────────────────────────────────
+val CardBorderColor = Color(0xFFE5E7EB) // 1dp 얇은 연회색 테두리
+
 // ── 삭제 스와이프 배경 ────────────────────────────────────────────
 val SwipeDeleteBackground = Color(0xFFEF4444)
