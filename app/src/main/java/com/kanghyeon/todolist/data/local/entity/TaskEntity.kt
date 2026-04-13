@@ -12,7 +12,7 @@ import androidx.room.PrimaryKey
  * - priority를 enum 대신 Int로 저장 → TypeConverter 없이 직접 정렬 가능
  * - sortOrder로 사용자 정의 순서(드래그) 지원
  * - showOnLockScreen 플래그로 잠금화면 노출 여부를 개별 제어
- * - Index(isDone, dueDate) → getTodayTasks / getLockScreenTasks 쿼리 최적화
+ * - Index(isDone, dueDate) → getLockScreenTasks / getCompletedTasksByDate 쿼리 최적화
  */
 @Entity(
     tableName = "tasks",
@@ -62,6 +62,12 @@ data class TaskEntity(
      * NONE / DAILY / WEEKLY / MONTHLY
      */
     val repeatType: RepeatType = RepeatType.NONE,
+
+    /**
+     * 사전 알림 시간 (분 단위, null = 알림 없음)
+     * 예: 10 → 마감 10분 전 알림. dueDate가 null이면 무시됨.
+     */
+    val reminderMinutes: Int? = null,
 )
 
 // ───────────────────────────────────────────────
