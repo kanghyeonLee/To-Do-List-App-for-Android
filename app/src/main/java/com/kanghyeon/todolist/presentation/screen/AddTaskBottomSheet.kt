@@ -63,6 +63,7 @@ import com.kanghyeon.todolist.data.local.entity.TaskEntity
 import com.kanghyeon.todolist.presentation.theme.PriorityHigh
 import com.kanghyeon.todolist.presentation.theme.PriorityLow
 import com.kanghyeon.todolist.presentation.theme.PriorityMedium
+import com.kanghyeon.todolist.presentation.viewmodel.NewTaskDraft
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -87,6 +88,7 @@ import java.util.Locale
 @Composable
 fun AddTaskBottomSheet(
     onDismiss: () -> Unit,
+    onCancel: () -> Unit = onDismiss,
     onSave: (
         title: String,
         description: String?,
@@ -95,28 +97,54 @@ fun AddTaskBottomSheet(
         showOnLockScreen: Boolean,
         reminderMinutes: Int?,
     ) -> Unit,
+    onDraftChange: (NewTaskDraft) -> Unit = {},
     task: TaskEntity? = null,
+    initialDraft: NewTaskDraft = NewTaskDraft(),
 ) {
     val isEditMode = task != null
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
-    // 수정 모드일 때 기존 dueDate에서 시간 추출
+    // 수정 모드: 기존 Task에서 시간 추출 / 추가 모드: draft에서 복원
     val initialTime = remember {
-        task?.dueDate?.let { ms ->
-            val lt = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()).toLocalTime()
-            LocalTime.of(lt.hour, lt.minute)
+        if (task != null) {
+            task.dueDate?.let { ms ->
+                val lt = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()).toLocalTime()
+                LocalTime.of(lt.hour, lt.minute)
+            }
+        } else {
+            if (initialDraft.selectedHour != null && initialDraft.selectedMinute != null)
+                LocalTime.of(initialDraft.selectedHour, initialDraft.selectedMinute)
+            else null
         }
     }
 
-    var title            by remember { mutableStateOf(task?.title ?: "") }
-    var description      by remember { mutableStateOf(task?.description ?: "") }
-    var selectedPriority by remember { mutableIntStateOf(task?.priority ?: Priority.MEDIUM.value) }
-    var showOnLockScreen by remember { mutableStateOf(task?.showOnLockScreen ?: true) }
+    // 추가 모드: draft 값으로 초기화 / 수정 모드: task 값으로 초기화
+    var title            by remember { mutableStateOf(task?.title ?: initialDraft.title) }
+    var description      by remember { mutableStateOf(task?.description ?: initialDraft.description) }
+    var selectedPriority by remember { mutableIntStateOf(task?.priority ?: initialDraft.priority) }
+    var showOnLockScreen by remember { mutableStateOf(task?.showOnLockScreen ?: initialDraft.showOnLockScreen) }
     var titleError       by remember { mutableStateOf(false) }
     var selectedTime     by remember { mutableStateOf<LocalTime?>(initialTime) }
-    var reminderMinutes  by remember { mutableStateOf<Int?>(task?.reminderMinutes) }
+    var reminderMinutes  by remember { mutableStateOf<Int?>(task?.reminderMinutes ?: initialDraft.reminderMinutes) }
     var showTimePicker   by remember { mutableStateOf(false) }
+
+    // 상태 변경 시 draft 동기화 (추가 모드에서만 의미 있음)
+    fun syncDraft() {
+        if (!isEditMode) {
+            onDraftChange(
+                NewTaskDraft(
+                    title            = title,
+                    description      = description,
+                    priority         = selectedPriority,
+                    selectedHour     = selectedTime?.hour,
+                    selectedMinute   = selectedTime?.minute,
+                    showOnLockScreen = showOnLockScreen,
+                    reminderMinutes  = reminderMinutes,
+                )
+            )
+        }
+    }
 
     // 마감일 = 오늘 + 선택된 시간
     val dueDate: Long? = selectedTime?.let { time ->
@@ -160,6 +188,7 @@ fun AddTaskBottomSheet(
                 TextButton(onClick = {
                     selectedTime = LocalTime.of(pickerHour, pickerMinute)
                     showTimePicker = false
+                    syncDraft()
                 }) { Text("확인") }
             },
             dismissButton = {
@@ -241,6 +270,7 @@ fun AddTaskBottomSheet(
                 onValueChange = {
                     title = it
                     if (it.isNotBlank()) titleError = false
+                    syncDraft()
                 },
                 label = { Text("제목 *") },
                 placeholder = { Text("무엇을 해야 하나요?") },
@@ -269,7 +299,7 @@ fun AddTaskBottomSheet(
             // ── 메모 입력 (선택) ──────────────────────────────
             TextField(
                 value = description,
-                onValueChange = { description = it },
+                onValueChange = { description = it; syncDraft() },
                 label = { Text("메모 (선택)") },
                 minLines = 2,
                 maxLines = 3,
@@ -300,19 +330,19 @@ fun AddTaskBottomSheet(
                         label = "낮음",
                         selected = selectedPriority == Priority.LOW.value,
                         selectedColor = PriorityLow,
-                        onClick = { selectedPriority = Priority.LOW.value },
+                        onClick = { selectedPriority = Priority.LOW.value; syncDraft() },
                     )
                     PriorityChip(
                         label = "보통",
                         selected = selectedPriority == Priority.MEDIUM.value,
                         selectedColor = PriorityMedium,
-                        onClick = { selectedPriority = Priority.MEDIUM.value },
+                        onClick = { selectedPriority = Priority.MEDIUM.value; syncDraft() },
                     )
                     PriorityChip(
                         label = "높음",
                         selected = selectedPriority == Priority.HIGH.value,
                         selectedColor = PriorityHigh,
-                        onClick = { selectedPriority = Priority.HIGH.value },
+                        onClick = { selectedPriority = Priority.HIGH.value; syncDraft() },
                     )
                 }
             }
@@ -342,6 +372,7 @@ fun AddTaskBottomSheet(
                     if (selectedTime != null) {
                         TextButton(onClick = {
                             selectedTime = null
+                            syncDraft()
                         }) {
                             Text("삭제")
                         }
@@ -365,10 +396,10 @@ fun AddTaskBottomSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ReminderChip("없음",  reminderMinutes == null) { reminderMinutes = null }
-                        ReminderChip("10분",  reminderMinutes == 10)   { reminderMinutes = 10 }
-                        ReminderChip("30분",  reminderMinutes == 30)   { reminderMinutes = 30 }
-                        ReminderChip("1시간", reminderMinutes == 60)   { reminderMinutes = 60 }
+                        ReminderChip("없음",  reminderMinutes == null) { reminderMinutes = null; syncDraft() }
+                        ReminderChip("10분",  reminderMinutes == 10)   { reminderMinutes = 10;  syncDraft() }
+                        ReminderChip("30분",  reminderMinutes == 30)   { reminderMinutes = 30;  syncDraft() }
+                        ReminderChip("1시간", reminderMinutes == 60)   { reminderMinutes = 60;  syncDraft() }
                     }
                 }
             }
@@ -403,7 +434,7 @@ fun AddTaskBottomSheet(
                 }
                 Switch(
                     checked = showOnLockScreen,
-                    onCheckedChange = { showOnLockScreen = it },
+                    onCheckedChange = { showOnLockScreen = it; syncDraft() },
                 )
             }
 
@@ -413,7 +444,7 @@ fun AddTaskBottomSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             ) {
                 TextButton(onClick = {
-                    scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+                    scope.launch { sheetState.hide() }.invokeOnCompletion { onCancel() }
                 }) {
                     Text("취소")
                 }

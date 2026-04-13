@@ -2,6 +2,7 @@ package com.kanghyeon.todolist.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kanghyeon.todolist.data.local.entity.Priority
 import com.kanghyeon.todolist.data.local.entity.TaskEntity
 import com.kanghyeon.todolist.data.repository.TaskRepository
 import com.kanghyeon.todolist.service.AlarmScheduler
@@ -21,6 +22,34 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
+
+// ──────────────────────────────────────────────────────────
+// 새 할 일 작성 임시 저장 (Draft)
+// ──────────────────────────────────────────────────────────
+
+/**
+ * 새 할 일 추가 시트의 입력 내용을 임시 보관하는 상태 객체.
+ *
+ * BottomSheet가 닫혀도 ViewModel이 살아있는 한 유지된다.
+ * 저장 완료 또는 명시적 취소(취소 버튼) 시 초기화.
+ * 스와이프·백 제스처로 닫을 때는 유지 → 재진입 시 복원.
+ *
+ * @param selectedHour   선택된 마감 시간 (null = 미설정)
+ * @param selectedMinute 선택된 마감 분   (null = 미설정)
+ */
+data class NewTaskDraft(
+    val title: String = "",
+    val description: String = "",
+    val priority: Int = Priority.MEDIUM.value,
+    val selectedHour: Int? = null,
+    val selectedMinute: Int? = null,
+    val showOnLockScreen: Boolean = true,
+    val reminderMinutes: Int? = null,
+) {
+    /** 기본값과 동일하면 비어 있는 draft로 간주 */
+    val isEmpty: Boolean
+        get() = title.isBlank() && description.isBlank() && selectedHour == null
+}
 
 // ──────────────────────────────────────────────────────────
 // UI State
@@ -133,6 +162,20 @@ class TaskViewModel @Inject constructor(
 
     fun setEditingTask(task: TaskEntity?) { _editingTask.value = task }
 
+    // ── 새 할 일 Draft ────────────────────────────────────
+    private val _newTaskDraft = MutableStateFlow(NewTaskDraft())
+    val newTaskDraft: StateFlow<NewTaskDraft> = _newTaskDraft.asStateFlow()
+
+    /** 시트 내용이 바뀔 때마다 호출 — draft 갱신 */
+    fun updateNewTaskDraft(draft: NewTaskDraft) {
+        _newTaskDraft.value = draft
+    }
+
+    /** 저장 완료 또는 명시적 취소 버튼 클릭 시 draft 초기화 */
+    fun clearNewTaskDraft() {
+        _newTaskDraft.value = NewTaskDraft()
+    }
+
     // ── 일회성 이벤트 채널 ────────────────────────────────
     private val _eventChannel = Channel<TaskEvent>(Channel.BUFFERED)
     val events = _eventChannel.receiveAsFlow()
@@ -183,6 +226,8 @@ class TaskViewModel @Inject constructor(
                 )
                 val id = repository.saveTask(task)
                 alarmScheduler.schedule(task.copy(id = id))
+                // 새 할 일 저장 성공 → draft 초기화
+                _newTaskDraft.value = NewTaskDraft()
             }
             _editingTask.value = null
         }

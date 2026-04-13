@@ -72,6 +72,7 @@ import com.kanghyeon.todolist.presentation.theme.CardBorderColor
 import com.kanghyeon.todolist.presentation.theme.PriorityHigh
 import com.kanghyeon.todolist.presentation.theme.PriorityLow
 import com.kanghyeon.todolist.presentation.theme.PriorityMedium
+import com.kanghyeon.todolist.presentation.viewmodel.NewTaskDraft
 import com.kanghyeon.todolist.presentation.viewmodel.TaskEvent
 import com.kanghyeon.todolist.presentation.viewmodel.TaskUiState
 import com.kanghyeon.todolist.presentation.viewmodel.TaskViewModel
@@ -89,10 +90,11 @@ import java.util.Locale
 fun MainScreen(
     viewModel: TaskViewModel = hiltViewModel(),
 ) {
-    val uiState      by viewModel.uiState.collectAsStateWithLifecycle()
-    val archiveDate  by viewModel.selectedArchiveDate.collectAsStateWithLifecycle()
-    val archiveTasks by viewModel.archiveTasks.collectAsStateWithLifecycle()
-    val editingTask  by viewModel.editingTask.collectAsStateWithLifecycle()
+    val uiState       by viewModel.uiState.collectAsStateWithLifecycle()
+    val archiveDate   by viewModel.selectedArchiveDate.collectAsStateWithLifecycle()
+    val archiveTasks  by viewModel.archiveTasks.collectAsStateWithLifecycle()
+    val editingTask   by viewModel.editingTask.collectAsStateWithLifecycle()
+    val newTaskDraft  by viewModel.newTaskDraft.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
     var showBottomSheet  by remember { mutableStateOf(false) }
@@ -238,9 +240,8 @@ fun MainScreen(
                     selected = selectedTab == 1,
                     onClick  = { selectedTab = 1 },
                     text     = {
-                        val count = uiState.completedTasks.size
                         Text(
-                            text  = if (count > 0) "아카이브 ($count)" else "아카이브",
+                            text  = "아카이브",
                             color = if (selectedTab == 1) MaterialTheme.colorScheme.primary
                                     else Color(0xFF6B7280),
                             style = MaterialTheme.typography.labelLarge.copy(
@@ -269,11 +270,24 @@ fun MainScreen(
     }
 
     if (showBottomSheet || editingTask != null) {
+        val isNewTask = editingTask == null
         AddTaskBottomSheet(
-            task      = editingTask,
+            task          = editingTask,
+            // 수정 모드일 때는 draft 사용 안 함
+            initialDraft  = if (isNewTask) newTaskDraft else NewTaskDraft(),
+            onDraftChange = { draft ->
+                if (isNewTask) viewModel.updateNewTaskDraft(draft)
+            },
             onDismiss = {
+                // 스와이프/바깥 탭으로 닫기 → draft 유지
                 showBottomSheet = false
                 viewModel.setEditingTask(null)
+            },
+            onCancel = {
+                // 취소 버튼 → draft 초기화
+                showBottomSheet = false
+                viewModel.setEditingTask(null)
+                if (isNewTask) viewModel.clearNewTaskDraft()
             },
             onSave = { title, desc, priority, dueDate, showOnLock, reminderMinutes ->
                 viewModel.saveCurrentTask(

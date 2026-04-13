@@ -21,6 +21,14 @@
     </style>
 
     <!--
+        TimePicker 스피너 전용 테마.
+        Compose AlertDialog 안의 AndroidView는 앱 테마 컨텍스트를 그대로 받기 때문에
+        다크 시스템이나 인디고 테마에서 NumberPicker 숫자가 흰색으로 보일 수 있다.
+        Light 계열 부모를 명시해 텍스트가 항상 검은색으로 렌더링되도록 강제한다.
+    -->
+    <style name="TimePickerSpinnerStyle" parent="android:Theme.DeviceDefault.Light.NoActionBar" />
+
+    <!--
         잠금화면 위 투명 오버레이 Activity 전용 테마.
         windowIsTranslucent=true : Activity 뒤 배경(잠금화면)이 비침
         backgroundDimEnabled=false : 딤 처리 없음
