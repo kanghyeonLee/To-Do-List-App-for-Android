@@ -26,7 +26,7 @@ import com.kanghyeon.todolist.data.local.entity.TaskEntity
  */
 @Database(
     entities = [TaskEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true,   // 스키마 JSON 파일 자동 생성 → git으로 버전 추적 가능
 )
 @TypeConverters(Converters::class)
@@ -47,11 +47,20 @@ abstract class AppDatabase : RoomDatabase() {
 
         /**
          * v1 → v2: reminderMinutes(INTEGER, nullable) 컬럼 추가.
-         * DEFAULT NULL로 기존 행은 알림 없음 상태로 유지.
          */
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE tasks ADD COLUMN reminderMinutes INTEGER DEFAULT NULL")
+            }
+        }
+
+        /**
+         * v2 → v3: isDeleted(INTEGER, NOT NULL DEFAULT 0) 컬럼 추가.
+         * Soft Delete 지원. 기존 행은 모두 isDeleted = 0 (정상) 유지.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tasks ADD COLUMN isDeleted INTEGER NOT NULL DEFAULT 0")
             }
         }
 
@@ -61,8 +70,8 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 DB_NAME,
             )
-                .addMigrations(MIGRATION_1_2)
-                .fallbackToDestructiveMigrationOnDowngrade() // 다운그레이드 시에만 파괴적 마이그레이션 허용
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
     }
 }

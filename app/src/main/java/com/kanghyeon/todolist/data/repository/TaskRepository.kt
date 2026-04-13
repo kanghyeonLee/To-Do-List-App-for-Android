@@ -53,10 +53,19 @@ interface TaskRepository {
     /** 순서 변경 (드래그 앤 드롭 완료 시 호출) */
     suspend fun updateSortOrders(orders: List<Pair<Long, Int>>)
 
-    /** 단건 삭제 */
+    /** Soft Delete: 휴지통으로 이동 */
+    suspend fun softDeleteTask(id: Long)
+
+    /** 휴지통에서 복구 */
+    suspend fun restoreFromTrash(id: Long)
+
+    /** 휴지통 비우기 (isDeleted = 1 전부 영구 삭제) */
+    suspend fun emptyTrash()
+
+    /** 단건 영구 삭제 */
     suspend fun deleteTask(task: TaskEntity)
 
-    /** ID로 삭제 */
+    /** ID로 영구 삭제 */
     suspend fun deleteById(id: Long)
 
     /** 완료 항목 전체 삭제 */
@@ -64,4 +73,7 @@ interface TaskRepository {
 
     /** 특정 날짜 범위에 완료된 항목 삭제 */
     suspend fun deleteCompletedByDate(startOfDay: Long, endOfDay: Long)
+
+    /** 휴지통 목록 스트림 */
+    fun getDeletedTasks(): Flow<List<TaskEntity>>
 }
