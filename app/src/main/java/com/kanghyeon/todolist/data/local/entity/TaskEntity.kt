@@ -32,6 +32,9 @@ data class TaskEntity(
     /** 완료 여부 */
     val isDone: Boolean = false,
 
+    /** Soft Delete: true면 휴지통으로 이동된 상태 */
+    val isDeleted: Boolean = false,
+
     /**
      * 우선순위
      * [Priority.kt] 참고: LOW=0, MEDIUM=1, HIGH=2

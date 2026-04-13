@@ -119,6 +119,14 @@ class TaskViewModel @Inject constructor(
             initialValue = emptyList(),
         )
 
+    // ── 휴지통 목록 ───────────────────────────────────────
+    val deletedTasks: StateFlow<List<TaskEntity>> = repository.getDeletedTasks()
+        .stateIn(
+            scope        = viewModelScope,
+            started      = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList(),
+        )
+
     // ── 편집 중인 Task ────────────────────────────────────
     private val _editingTask = MutableStateFlow<TaskEntity?>(null)
     val editingTask: StateFlow<TaskEntity?> = _editingTask.asStateFlow()
@@ -233,22 +241,45 @@ class TaskViewModel @Inject constructor(
     }
 
     /**
-     * 할 일 삭제 (Undo 지원)
-     * 삭제 전 Task를 TaskDeleted 이벤트로 전달 → UI에서 Snackbar "실행 취소" 제공 가능
+     * 할 일을 휴지통으로 이동 (Soft Delete).
+     * Snackbar "실행 취소"로 즉시 복구 가능.
      */
     fun deleteTask(task: TaskEntity) {
         viewModelScope.launch {
             alarmScheduler.cancel(task.id)
-            repository.deleteTask(task)
+            repository.softDeleteTask(task.id)
             emitEvent(TaskEvent.TaskDeleted(task))
         }
     }
 
-    /** 삭제 취소: 이전에 삭제한 Task를 복원 */
+    /** 휴지통 이동 취소 (Snackbar Undo) */
     fun restoreTask(task: TaskEntity) {
         viewModelScope.launch {
-            repository.saveTask(task)
+            repository.restoreFromTrash(task.id)
             alarmScheduler.schedule(task)
+        }
+    }
+
+    /** 휴지통에서 복구 (TrashScreen 복구 버튼) */
+    fun restoreFromTrash(task: TaskEntity) {
+        viewModelScope.launch {
+            repository.restoreFromTrash(task.id)
+            alarmScheduler.schedule(task)
+        }
+    }
+
+    /** 영구 삭제 (단건) */
+    fun permanentlyDeleteTask(task: TaskEntity) {
+        viewModelScope.launch {
+            repository.deleteTask(task)
+        }
+    }
+
+    /** 휴지통 비우기 */
+    fun emptyAllTrash() {
+        viewModelScope.launch {
+            repository.emptyTrash()
+            emitEvent(TaskEvent.ShowMessage("휴지통을 비웠습니다."))
         }
     }
 

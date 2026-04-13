@@ -86,20 +86,26 @@ class TaskRepositoryImpl @Inject constructor(
             }
         }
 
+    override suspend fun softDeleteTask(id: Long) =
+        withContext(dispatcher) { dao.softDelete(id) }
+
+    override suspend fun restoreFromTrash(id: Long) =
+        withContext(dispatcher) { dao.restoreFromTrash(id) }
+
+    override suspend fun emptyTrash() =
+        withContext(dispatcher) { dao.emptyTrash() }
+
+    override fun getDeletedTasks(): Flow<List<TaskEntity>> =
+        dao.getDeletedTasks().flowOn(dispatcher)
+
     override suspend fun deleteTask(task: TaskEntity) =
-        withContext(dispatcher) {
-            dao.delete(task)
-        }
+        withContext(dispatcher) { dao.delete(task) }
 
     override suspend fun deleteById(id: Long) =
-        withContext(dispatcher) {
-            dao.deleteById(id)
-        }
+        withContext(dispatcher) { dao.deleteById(id) }
 
     override suspend fun deleteAllCompleted() =
-        withContext(dispatcher) {
-            dao.deleteAllCompleted()
-        }
+        withContext(dispatcher) { dao.deleteAllCompleted() }
 
     override suspend fun deleteCompletedByDate(startOfDay: Long, endOfDay: Long) =
         withContext(dispatcher) {

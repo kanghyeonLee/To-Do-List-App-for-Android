@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -110,8 +111,9 @@ fun MainScreen(
     val editingTask     by viewModel.editingTask.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
-    var showBottomSheet by remember { mutableStateOf(false) }
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var showBottomSheet  by remember { mutableStateOf(false) }
+    var showTrashScreen  by remember { mutableStateOf(false) }
+    var selectedTab      by remember { mutableIntStateOf(0) }
 
     // TopAppBar 스크롤 연동 (스크롤 시 TopAppBar 축소)
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -128,7 +130,7 @@ fun MainScreen(
                 }
                 is TaskEvent.TaskDeleted -> {
                     val result = snackbarHostState.showSnackbar(
-                        message = "「${event.task.title}」을(를) 삭제했습니다.",
+                        message = "휴지통으로 이동했습니다.",
                         actionLabel = "실행 취소",
                         duration = SnackbarDuration.Short,
                     )
@@ -151,6 +153,13 @@ fun MainScreen(
                     )
                 },
                 actions = {
+                    // 휴지통 이동 버튼 (항상 표시)
+                    IconButton(onClick = { showTrashScreen = true }) {
+                        Icon(
+                            imageVector = Icons.Outlined.DeleteOutline,
+                            contentDescription = "휴지통",
+                        )
+                    }
                     // 아카이브 탭 + 선택 날짜에 항목이 있을 때만 삭제 버튼 노출
                     if (selectedTab == 1 && archiveTasks.isNotEmpty()) {
                         IconButton(onClick = viewModel::clearCompletedForSelectedDate) {
@@ -212,6 +221,14 @@ fun MainScreen(
                 else              -> ArchiveContent(archiveDate, archiveTasks, viewModel)
             }
         }
+    }
+
+    // ── 휴지통 화면 ──────────────────────────────────────────
+    if (showTrashScreen) {
+        TrashScreen(
+            viewModel = viewModel,
+            onBack    = { showTrashScreen = false },
+        )
     }
 
     // ── 할 일 추가 / 수정 BottomSheet ────────────────────────
