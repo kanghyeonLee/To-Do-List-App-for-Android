@@ -186,3 +186,10 @@ cd ToDoList
 | v1.2.0 | 완료 토글 및 스와이프 삭제 구현 |
 | v1.1.x | 아카이브 탭, 날짜별 완료 필터링 |
 | v1.0.x | 기본 CRUD, 우선순위 분류, 알림 |
+
+---
+
+## 변경 이력 (Changelog)
+
+<!-- CHANGELOG_START -->
+<!-- CHANGELOG_END -->
