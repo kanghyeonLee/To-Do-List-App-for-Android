@@ -24,23 +24,26 @@ class RoutineTemplateRepositoryImpl @Inject constructor(
     override suspend fun getActiveGroupsWithTasksOnce(): List<RoutineTemplateGroupWithTasks> =
         withContext(dispatcher) { dao.getActiveGroupsWithTasksOnce() }
 
+    override suspend fun getGroupWithTasksOnce(groupId: Long): RoutineTemplateGroupWithTasks? =
+        withContext(dispatcher) { dao.getGroupWithTasksOnce(groupId) }
+
     override suspend fun addGroup(name: String): Long =
         withContext(dispatcher) {
             dao.insertGroup(RoutineTemplateGroupEntity(name = name))
         }
 
-    override suspend fun updateGroupActiveState(id: Long, isActive: Boolean) =
-        withContext(dispatcher) { dao.updateGroupActiveState(id, isActive) }
-
     override suspend fun updateGroupName(id: Long, name: String) =
         withContext(dispatcher) { dao.updateGroupName(id, name) }
 
+    override suspend fun updateGroupActiveState(id: Long, isActive: Boolean) =
+        withContext(dispatcher) { dao.updateGroupActiveState(id, isActive) }
+
     override suspend fun deleteGroup(id: Long) =
-        withContext(dispatcher) { dao.deleteGroupById(id) }
+        withContext(dispatcher) { dao.deleteGroup(id) }
 
     override suspend fun addTask(task: RoutineTemplateTaskEntity): Long =
         withContext(dispatcher) { dao.insertTask(task) }
 
     override suspend fun deleteTask(id: Long) =
-        withContext(dispatcher) { dao.deleteTaskById(id) }
+        withContext(dispatcher) { dao.deleteTask(id) }
 }

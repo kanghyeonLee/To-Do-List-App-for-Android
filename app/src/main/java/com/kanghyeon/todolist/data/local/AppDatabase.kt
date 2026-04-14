@@ -40,6 +40,7 @@ import com.kanghyeon.todolist.data.local.entity.TaskEntity
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun taskDao(): TaskDao
+
     abstract fun routineTemplateDao(): RoutineTemplateDao
 
     companion object {
@@ -67,7 +68,10 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        /** v3 → v4: routine_templates 단일 테이블 생성. */
+        /**
+         * v3 → v4: 루틴 템플릿 단일 테이블 생성 (임시 구조).
+         * v4 → v5 마이그레이션에서 이 테이블을 제거하고 1:N 구조로 전환한다.
+         */
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -94,10 +98,8 @@ abstract class AppDatabase : RoomDatabase() {
          */
         val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // 기존 단일 템플릿 테이블 제거
                 db.execSQL("DROP TABLE IF EXISTS routine_templates")
 
-                // 템플릿 그룹 테이블
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS routine_template_groups (
@@ -109,7 +111,6 @@ abstract class AppDatabase : RoomDatabase() {
                     """.trimIndent()
                 )
 
-                // 그룹별 할 일 테이블 (groupId FK with CASCADE)
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS routine_template_tasks (
@@ -124,9 +125,9 @@ abstract class AppDatabase : RoomDatabase() {
                     """.trimIndent()
                 )
 
-                // groupId 인덱스
                 db.execSQL(
-                    "CREATE INDEX IF NOT EXISTS index_routine_template_tasks_groupId ON routine_template_tasks(groupId)"
+                    "CREATE INDEX IF NOT EXISTS index_routine_template_tasks_groupId " +
+                    "ON routine_template_tasks(groupId)"
                 )
             }
         }

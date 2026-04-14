@@ -233,6 +233,11 @@ class TaskViewModel @Inject constructor(
     private val _eventChannel = Channel<TaskEvent>(Channel.BUFFERED)
     val events = _eventChannel.receiveAsFlow()
 
+    // ── 초기화: 자정 자동 루틴 주입 ──────────────────────
+    init {
+        viewModelScope.launch { generateDailyRoutines() }
+    }
+
     // ──────────────────────────────────────────────────────
     // 사용자 액션 핸들러
     // ──────────────────────────────────────────────────────
@@ -602,6 +607,38 @@ class TaskViewModel @Inject constructor(
             if (taskCount > 0) {
                 emitEvent(TaskEvent.ShowMessage("루틴 ${taskCount}개가 오늘의 할 일에 추가됐습니다."))
             }
+        }
+    }
+
+    // ──────────────────────────────────────────────────────
+    // 루틴 템플릿 — 즉시 주입 (Manual Injection)
+    // ──────────────────────────────────────────────────────
+
+    /**
+     * 특정 템플릿 그룹의 할 일들을 오늘의 할 일로 즉시 복사·저장.
+     *
+     * - dueDate 없음 (기한 없는 오늘 할 일로 생성)
+     * - isDone = false, isDeleted = false (기본값)
+     * - 완료 시 ShowMessage 이벤트 방출 → MainScreen Snackbar 표시
+     */
+    fun applyTemplateNow(groupId: Long) {
+        viewModelScope.launch {
+            val groupWithTasks = templateRepository.getGroupWithTasksOnce(groupId) ?: return@launch
+            if (groupWithTasks.tasks.isEmpty()) {
+                emitEvent(TaskEvent.ShowMessage("이 템플릿에 등록된 할 일이 없습니다."))
+                return@launch
+            }
+            groupWithTasks.tasks.forEach { templateTask ->
+                repository.saveTask(
+                    TaskEntity(
+                        title           = templateTask.title,
+                        description     = templateTask.description,
+                        priority        = templateTask.priority,
+                        showOnLockScreen = templateTask.showOnLockScreen,
+                    )
+                )
+            }
+            emitEvent(TaskEvent.ShowMessage("오늘 할 일에 추가되었습니다."))
         }
     }
 

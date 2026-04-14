@@ -2,11 +2,19 @@
   "formatVersion": 1,
   "database": {
     "version": 4,
+<<<<<<< HEAD
+    "identityHash": "bb8b4f14d592e117608f81e7bcf8254b",
+    "entities": [
+      {
+        "tableName": "tasks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `description` TEXT, `isDone` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL, `priority` INTEGER NOT NULL, `showOnLockScreen` INTEGER NOT NULL, `dueDate` INTEGER, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL, `repeatType` TEXT NOT NULL, `reminderMinutes` INTEGER)",
+=======
     "identityHash": "c9d9bfa62681d1f2db918f76efef5c31",
     "entities": [
       {
         "tableName": "tasks",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `description` TEXT, `isDone` INTEGER NOT NULL, `isDeleted` INTEGER NOT NULL, `priority` INTEGER NOT NULL, `showOnLockScreen` INTEGER NOT NULL, `dueDate` INTEGER, `isArchived` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL, `repeatType` TEXT NOT NULL, `reminderMinutes` INTEGER)",
+>>>>>>> 0665fc0365d14f0fa24bb625b8cb91f78f3bf451
         "fields": [
           {
             "fieldPath": "id",
@@ -57,12 +65,15 @@
             "notNull": false
           },
           {
+<<<<<<< HEAD
+=======
             "fieldPath": "isArchived",
             "columnName": "isArchived",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
+>>>>>>> 0665fc0365d14f0fa24bb625b8cb91f78f3bf451
             "fieldPath": "createdAt",
             "columnName": "createdAt",
             "affinity": "INTEGER",
@@ -114,8 +125,13 @@
         "foreignKeys": []
       },
       {
+<<<<<<< HEAD
+        "tableName": "routine_template_groups",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `isActive` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL)",
+=======
         "tableName": "routine_templates",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `description` TEXT, `priority` INTEGER NOT NULL, `showOnLockScreen` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL)",
+>>>>>>> 0665fc0365d14f0fa24bb625b8cb91f78f3bf451
         "fields": [
           {
             "fieldPath": "id",
@@ -124,6 +140,53 @@
             "notNull": true
           },
           {
+<<<<<<< HEAD
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isActive",
+            "columnName": "isActive",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "routine_template_tasks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `groupId` INTEGER NOT NULL, `title` TEXT NOT NULL, `description` TEXT, `priority` INTEGER NOT NULL, `showOnLockScreen` INTEGER NOT NULL, FOREIGN KEY(`groupId`) REFERENCES `routine_template_groups`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "groupId",
+            "columnName": "groupId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+=======
+>>>>>>> 0665fc0365d14f0fa24bb625b8cb91f78f3bf451
             "fieldPath": "title",
             "columnName": "title",
             "affinity": "TEXT",
@@ -146,12 +209,15 @@
             "columnName": "showOnLockScreen",
             "affinity": "INTEGER",
             "notNull": true
+<<<<<<< HEAD
+=======
           },
           {
             "fieldPath": "createdAt",
             "columnName": "createdAt",
             "affinity": "INTEGER",
             "notNull": true
+>>>>>>> 0665fc0365d14f0fa24bb625b8cb91f78f3bf451
           }
         ],
         "primaryKey": {
@@ -160,14 +226,45 @@
             "id"
           ]
         },
+<<<<<<< HEAD
+        "indices": [
+          {
+            "name": "index_routine_template_tasks_groupId",
+            "unique": false,
+            "columnNames": [
+              "groupId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_routine_template_tasks_groupId` ON `${TABLE_NAME}` (`groupId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "routine_template_groups",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "groupId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+=======
         "indices": [],
         "foreignKeys": []
+>>>>>>> 0665fc0365d14f0fa24bb625b8cb91f78f3bf451
       }
     ],
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+<<<<<<< HEAD
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'bb8b4f14d592e117608f81e7bcf8254b')"
+=======
       "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'c9d9bfa62681d1f2db918f76efef5c31')"
+>>>>>>> 0665fc0365d14f0fa24bb625b8cb91f78f3bf451
     ]
   }
 }
