@@ -64,7 +64,7 @@
 
 | 분류 | 기술 |
 |:---|:---|
-| **언어** | Kotlin |
+| **언어** | Kotlin | 
 | **UI** | Jetpack Compose, Material 3, Pretendard 폰트 |
 | **아키텍처** | MVVM, Clean Architecture 패턴 지향, Single Activity |
 | **상태 관리** | StateFlow, Channel (일회성 이벤트) |
