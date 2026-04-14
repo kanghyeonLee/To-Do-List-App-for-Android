@@ -274,8 +274,8 @@ fun MainScreen(
                                     Text("취소", color = Color(0xFF6B7280))
                                 }
                             },
-                            shape = RoundedCornerShape(16.dp),
-                            containerColor = MaterialTheme.colorScheme.surface,
+                            shape          = RoundedCornerShape(16.dp),
+                            containerColor = Color.White,
                         )
                     }
                 },
@@ -434,7 +434,8 @@ fun MainScreen(
                     Text("취소")
                 }
             },
-            shape = RoundedCornerShape(16.dp),
+            shape          = RoundedCornerShape(16.dp),
+            containerColor = Color.White,
         )
     }
 

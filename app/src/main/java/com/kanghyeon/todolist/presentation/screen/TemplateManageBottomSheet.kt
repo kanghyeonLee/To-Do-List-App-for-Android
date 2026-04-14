@@ -117,13 +117,14 @@ fun TemplateManageBottomSheet(
                     val group = templateGroups.find { it.group.id == screen.groupId }
                     if (group != null) {
                         GroupDetailScreen(
-                            group        = group,
-                            onBack       = { currentScreen = TemplateScreen.GroupList },
-                            onAddTask    = { title, desc, priority ->
+                            group          = group,
+                            onBack         = { currentScreen = TemplateScreen.GroupList },
+                            onAddTask      = { title, desc, priority ->
                                 viewModel.addTemplateTask(screen.groupId, title, desc, priority)
                             },
-                            onDeleteTask = { id -> viewModel.deleteTemplateTask(id) },
-                            onApplyNow   = { viewModel.applyTemplateNow(screen.groupId) },
+                            onDeleteTask   = { id -> viewModel.deleteTemplateTask(id) },
+                            onApplyNow     = { viewModel.applyTemplateNow(screen.groupId) },
+                            onRenameGroup  = { name -> viewModel.renameTemplateGroup(screen.groupId, name) },
                         )
                     }
                 }
@@ -183,7 +184,8 @@ private fun GroupListScreen(
             dismissButton = {
                 TextButton(onClick = { confirmDeleteId = null }) { Text("취소") }
             },
-            shape = RoundedCornerShape(16.dp),
+            shape          = RoundedCornerShape(16.dp),
+            containerColor = Color.White,
         )
     }
 
@@ -405,17 +407,98 @@ private fun GroupCard(
 
 @Composable
 private fun GroupDetailScreen(
-    group:        RoutineTemplateGroupWithTasks,
-    onBack:       () -> Unit,
-    onAddTask:    (title: String, description: String?, priority: Int) -> Unit,
-    onDeleteTask: (Long) -> Unit,
-    onApplyNow:   () -> Unit,
+    group:         RoutineTemplateGroupWithTasks,
+    onBack:        () -> Unit,
+    onAddTask:     (title: String, description: String?, priority: Int) -> Unit,
+    onDeleteTask:  (Long) -> Unit,
+    onApplyNow:    () -> Unit,
+    onRenameGroup: (String) -> Unit,
 ) {
     var showApplyConfirm by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var renameInput      by remember { mutableStateOf("") }
     var showAddTaskForm  by remember { mutableStateOf(false) }
     var taskTitle        by remember { mutableStateOf("") }
     var taskDesc         by remember { mutableStateOf("") }
     var selectedPriority by remember { mutableIntStateOf(Priority.MEDIUM.value) }
+
+    // ── 이름 수정 다이얼로그 ────────────────────────────────────────
+    if (showRenameDialog) {
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false; renameInput = "" },
+            icon = {
+                Icon(
+                    painter            = painterResource(R.drawable.pencil),
+                    contentDescription = null,
+                    tint               = MaterialTheme.colorScheme.primary,
+                    modifier           = Modifier.size(28.dp),
+                )
+            },
+            title = {
+                Text(
+                    text  = "템플릿 이름 수정",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color      = Color(0xFF1D1D1F),
+                    ),
+                )
+            },
+            text = {
+                TextField(
+                    value         = renameInput,
+                    onValueChange = { renameInput = it },
+                    modifier      = Modifier.fillMaxWidth(),
+                    placeholder   = { Text("새 이름 입력") },
+                    singleLine    = true,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        imeAction      = ImeAction.Done,
+                    ),
+                    keyboardActions = KeyboardActions(onDone = {
+                        if (renameInput.isNotBlank()) {
+                            onRenameGroup(renameInput.trim())
+                            showRenameDialog = false
+                            renameInput = ""
+                        }
+                    }),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor   = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor   = MaterialTheme.colorScheme.primary,
+                        unfocusedIndicatorColor = Color(0xFFE5E7EB),
+                        focusedTextColor        = Color(0xFF1D1D1F),
+                        unfocusedTextColor      = Color(0xFF1D1D1F),
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (renameInput.isNotBlank()) {
+                            onRenameGroup(renameInput.trim())
+                            showRenameDialog = false
+                            renameInput = ""
+                        }
+                    },
+                    enabled = renameInput.isNotBlank(),
+                ) {
+                    Text(
+                        text  = "저장",
+                        color = if (renameInput.isNotBlank()) MaterialTheme.colorScheme.primary
+                                else Color(0xFF9CA3AF),
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false; renameInput = "" }) {
+                    Text("취소", color = Color(0xFF6B7280))
+                }
+            },
+            containerColor = Color.White,
+            shape          = RoundedCornerShape(20.dp),
+        )
+    }
 
     if (showApplyConfirm) {
         AlertDialog(
@@ -455,7 +538,8 @@ private fun GroupDetailScreen(
             dismissButton = {
                 TextButton(onClick = { showApplyConfirm = false }) { Text("취소") }
             },
-            shape = RoundedCornerShape(16.dp),
+            shape          = RoundedCornerShape(16.dp),
+            containerColor = Color.White,
         )
     }
 
@@ -479,12 +563,21 @@ private fun GroupDetailScreen(
                 )
             }
             Text(
-                text  = group.group.name,
-                style = MaterialTheme.typography.titleLarge.copy(
+                text     = group.group.name,
+                modifier = Modifier.weight(1f),
+                style    = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold,
                     color      = Color(0xFF1D1D1F),
                 ),
             )
+            IconButton(onClick = { renameInput = group.group.name; showRenameDialog = true }) {
+                Icon(
+                    painter            = painterResource(R.drawable.pencil),
+                    contentDescription = "이름 수정",
+                    tint               = Color(0xFF6B7280),
+                    modifier           = Modifier.size(18.dp),
+                )
+            }
         }
 
         Spacer(Modifier.height(2.dp))
