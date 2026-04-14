@@ -112,10 +112,11 @@ fun MainScreen(
     val editingTask          by viewModel.editingTask.collectAsStateWithLifecycle()
     val newTaskDraft         by viewModel.newTaskDraft.collectAsStateWithLifecycle()
 
-    val snackbarHostState    = remember { SnackbarHostState() }
-    var showBottomSheet      by remember { mutableStateOf(false) }
-    var showTrashScreen      by remember { mutableStateOf(false) }
-    var selectedTab          by remember { mutableIntStateOf(0) }
+    val snackbarHostState      = remember { SnackbarHostState() }
+    var showBottomSheet        by remember { mutableStateOf(false) }
+    var showTrashScreen        by remember { mutableStateOf(false) }
+    var showTemplateSheet      by remember { mutableStateOf(false) }
+    var selectedTab            by remember { mutableIntStateOf(0) }
     // 아카이브 일괄 삭제 확인 다이얼로그 표시 여부
     var showBulkDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -159,6 +160,15 @@ fun MainScreen(
                     )
                 },
                 actions = {
+                    // 루틴 템플릿 관리 버튼
+                    IconButton(onClick = { showTemplateSheet = true }) {
+                        Icon(
+                            painter            = painterResource(R.drawable.rotate_ccw),
+                            contentDescription = "루틴 템플릿 관리",
+                            tint               = Color(0xFF6B7280),
+                            modifier           = Modifier.size(22.dp),
+                        )
+                    }
                     IconButton(onClick = { showTrashScreen = true }) {
                         Icon(
                             painter            = painterResource(R.drawable.trash_2),
@@ -342,6 +352,14 @@ fun MainScreen(
         TrashScreen(
             viewModel = viewModel,
             onBack    = { showTrashScreen = false },
+        )
+    }
+
+    // ── 루틴 템플릿 관리 BottomSheet ──────────────────────────────
+    if (showTemplateSheet) {
+        TemplateManageBottomSheet(
+            viewModel = viewModel,
+            onDismiss = { showTemplateSheet = false },
         )
     }
 

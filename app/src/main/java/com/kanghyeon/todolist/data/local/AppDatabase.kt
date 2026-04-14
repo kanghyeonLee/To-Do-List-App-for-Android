@@ -8,7 +8,10 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.kanghyeon.todolist.data.local.converter.Converters
+import com.kanghyeon.todolist.data.local.dao.RoutineTemplateDao
 import com.kanghyeon.todolist.data.local.dao.TaskDao
+import com.kanghyeon.todolist.data.local.entity.RoutineTemplateGroupEntity
+import com.kanghyeon.todolist.data.local.entity.RoutineTemplateTaskEntity
 import com.kanghyeon.todolist.data.local.entity.TaskEntity
 
 /**
@@ -25,14 +28,20 @@ import com.kanghyeon.todolist.data.local.entity.TaskEntity
  *   (Hilt 미사용 프로젝트를 위해 getInstance()도 함께 제공)
  */
 @Database(
-    entities = [TaskEntity::class],
-    version = 3,
+    entities = [
+        TaskEntity::class,
+        RoutineTemplateGroupEntity::class,
+        RoutineTemplateTaskEntity::class,
+    ],
+    version = 4,
     exportSchema = true,   // 스키마 JSON 파일 자동 생성 → git으로 버전 추적 가능
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun taskDao(): TaskDao
+
+    abstract fun routineTemplateDao(): RoutineTemplateDao
 
     companion object {
         private const val DB_NAME = "todo_database"
@@ -64,13 +73,51 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v3 → v4: 루틴 템플릿 테이블 2개 추가.
+         * routine_template_groups: 그룹(이름, 활성화 여부)
+         * routine_template_tasks: 그룹 소속 할 일 청사진 (FK CASCADE)
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `routine_template_groups` (
+                        `id`        INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name`      TEXT    NOT NULL,
+                        `isActive`  INTEGER NOT NULL DEFAULT 1,
+                        `createdAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `routine_template_tasks` (
+                        `id`              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `groupId`         INTEGER NOT NULL,
+                        `title`           TEXT    NOT NULL,
+                        `description`     TEXT,
+                        `priority`        INTEGER NOT NULL DEFAULT 1,
+                        `showOnLockScreen` INTEGER NOT NULL DEFAULT 1,
+                        FOREIGN KEY (`groupId`) REFERENCES `routine_template_groups` (`id`)
+                            ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_routine_template_tasks_groupId` " +
+                    "ON `routine_template_tasks` (`groupId`)"
+                )
+            }
+        }
+
         private fun buildDatabase(context: Context): AppDatabase =
             Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
                 DB_NAME,
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
     }
