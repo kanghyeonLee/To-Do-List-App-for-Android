@@ -1,5 +1,7 @@
 package com.kanghyeon.todolist.di
 
+import com.kanghyeon.todolist.data.repository.GoalRepository
+import com.kanghyeon.todolist.data.repository.GoalRepositoryImpl
 import com.kanghyeon.todolist.data.repository.RoutineTemplateRepository
 import com.kanghyeon.todolist.data.repository.RoutineTemplateRepositoryImpl
 import com.kanghyeon.todolist.data.repository.TaskRepository
@@ -29,6 +31,12 @@ abstract class RepositoryModule {
     abstract fun bindTaskRepository(
         impl: TaskRepositoryImpl,
     ): TaskRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindGoalRepository(
+        impl: GoalRepositoryImpl,
+    ): GoalRepository
 
     @Binds
     @Singleton

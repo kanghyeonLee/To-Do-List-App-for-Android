@@ -1,21 +1,34 @@
 package com.kanghyeon.todolist.data.local.converter
 
 import androidx.room.TypeConverter
+import com.kanghyeon.todolist.data.local.entity.GoalType
 import com.kanghyeon.todolist.data.local.entity.RepeatType
 
 /**
  * Room TypeConverter
  *
- * RepeatType enum ↔ String 변환
- * Room은 기본적으로 enum을 저장할 수 없으므로 TypeConverter 등록 필요.
- * AppDatabase에 @TypeConverters(Converters::class)로 등록한다.
+ * Enum ↔ String 변환 (Room은 enum을 직접 저장할 수 없음)
+ * AppDatabase에 @TypeConverters(Converters::class)로 일괄 등록한다.
+ *
+ * [등록된 TypeConverter]
+ * - RepeatType ↔ String
+ * - GoalType   ↔ String
  */
 class Converters {
 
+    // ── RepeatType ────────────────────────────────────────
     @TypeConverter
     fun fromRepeatType(type: RepeatType): String = type.name
 
     @TypeConverter
     fun toRepeatType(value: String): RepeatType =
         runCatching { RepeatType.valueOf(value) }.getOrDefault(RepeatType.NONE)
+
+    // ── GoalType ──────────────────────────────────────────
+    @TypeConverter
+    fun fromGoalType(type: GoalType): String = type.name
+
+    @TypeConverter
+    fun toGoalType(value: String): GoalType =
+        runCatching { GoalType.valueOf(value) }.getOrDefault(GoalType.COUNT)
 }

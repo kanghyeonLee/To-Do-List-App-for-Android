@@ -266,6 +266,7 @@ class TaskViewModel @Inject constructor(
         dueDate: Long? = null,
         showOnLockScreen: Boolean = true,
         reminderMinutes: Int? = null,
+        goalId: Long? = null,
     ) {
         if (title.isBlank()) {
             emitEvent(TaskEvent.ShowMessage("제목을 입력해 주세요."))
@@ -282,6 +283,7 @@ class TaskViewModel @Inject constructor(
                     showOnLockScreen = showOnLockScreen,
                     reminderMinutes  = reminderMinutes,
                     updatedAt        = System.currentTimeMillis(),
+                    goalId           = goalId,
                 )
                 repository.updateTask(updated)
                 alarmScheduler.cancel(editing.id)
@@ -296,6 +298,7 @@ class TaskViewModel @Inject constructor(
                     dueDate          = dueDate,
                     showOnLockScreen = showOnLockScreen,
                     reminderMinutes  = reminderMinutes,
+                    goalId           = goalId,
                 )
                 val id = repository.saveTask(task)
                 if (task.dueDate != null) {

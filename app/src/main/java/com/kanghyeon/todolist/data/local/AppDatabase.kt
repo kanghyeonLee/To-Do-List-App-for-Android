@@ -8,8 +8,10 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.kanghyeon.todolist.data.local.converter.Converters
+import com.kanghyeon.todolist.data.local.dao.GoalDao
 import com.kanghyeon.todolist.data.local.dao.RoutineTemplateDao
 import com.kanghyeon.todolist.data.local.dao.TaskDao
+import com.kanghyeon.todolist.data.local.entity.GoalEntity
 import com.kanghyeon.todolist.data.local.entity.RoutineTemplateGroupEntity
 import com.kanghyeon.todolist.data.local.entity.RoutineTemplateTaskEntity
 import com.kanghyeon.todolist.data.local.entity.TaskEntity
@@ -30,16 +32,19 @@ import com.kanghyeon.todolist.data.local.entity.TaskEntity
 @Database(
     entities = [
         TaskEntity::class,
+        GoalEntity::class,
         RoutineTemplateGroupEntity::class,
         RoutineTemplateTaskEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun taskDao(): TaskDao
+
+    abstract fun goalDao(): GoalDao
 
     abstract fun routineTemplateDao(): RoutineTemplateDao
 
@@ -142,6 +147,41 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v6 → v7: 목표(Goal) 기능 추가.
+         *
+         * 변경 사항:
+         * 1. tasks 테이블에 goalId(INTEGER, nullable) 컬럼 추가
+         *    - 기존 데이터는 null(목표 미연결) 상태로 유지
+         * 2. goals 테이블 신규 생성
+         *    - type 컬럼: GoalType enum을 String으로 저장 (Converters.kt)
+         *    - colorHex: 기본값 '#4F46E5' (인디고)
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. tasks에 goalId 컬럼 추가
+                db.execSQL(
+                    "ALTER TABLE tasks ADD COLUMN goalId INTEGER DEFAULT NULL"
+                )
+
+                // 2. goals 테이블 생성
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS goals (
+                        id           INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        title        TEXT    NOT NULL,
+                        type         TEXT    NOT NULL DEFAULT 'COUNT',
+                        targetValue  INTEGER NOT NULL DEFAULT 1,
+                        startDate    INTEGER NOT NULL,
+                        endDate      INTEGER NOT NULL,
+                        colorHex     TEXT    NOT NULL DEFAULT '#4F46E5',
+                        createdAt    INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         private fun buildDatabase(context: Context): AppDatabase =
             Room.databaseBuilder(
                 context.applicationContext,
@@ -150,7 +190,7 @@ abstract class AppDatabase : RoomDatabase() {
             )
                 .addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-                    MIGRATION_5_6,
+                    MIGRATION_5_6, MIGRATION_6_7,
                 )
                 .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
