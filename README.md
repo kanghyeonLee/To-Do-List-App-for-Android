@@ -1,281 +1,36 @@
 # To Do List
 
-![Version](https://img.shields.io/badge/version-1.3.2-5C6BC0)
-<!-- APP_VERSION: v1.3.2 -->
 ![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=white)
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)
 ![Room](https://img.shields.io/badge/Room-DB-4CAF50)
-![Hilt](https://img.shields.io/badge/Hilt-DI-FF6F00)
-![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)
-![AI](https://img.shields.io/badge/AI%20Release%20Notes-Gemini-8E24AA?logo=google&logoColor=white)
 
-> 우선순위 기반 할 일 관리 + 루틴 템플릿 + AI 자동 릴리즈 노트까지 갖춘  
-> Jetpack Compose + Material 3 기반 안드로이드 앱
-
----
-
-## 스크린샷
-
-| 메인 화면 | 루틴 템플릿 | 아카이브 | 휴지통 |
-|:---------:|:-----------:|:--------:|:------:|
-| ![메인 화면](resources/images/메인화면.jpeg) | ![루틴 템플릿](resources/images/템플릿.jpeg) | ![아카이브](resources/images/아카이브.jpeg) | ![휴지통](resources/images/휴지통.jpeg) |
+> 우선순위 기반 할 일 관리, 목표 연동 및 루틴 템플릿 기능을 갖춘 안드로이드 앱입니다.
 
 ---
 
 ## 주요 기능
 
-### 1. 직관적인 할 일 관리
-- **우선순위 3단계** (높음 / 보통 / 낮음) — 스와이프 탭(Pager)으로 분류 탐색
-- **BottomSheet 빠른 입력** — FAB 한 번으로 제목·메모·우선순위·마감 시간 설정
-- **스와이프 삭제** — 좌측으로 밀어 휴지통 이동, 5초 이내 Undo 지원
-- **작성 중 임시 저장** — 시트를 닫아도 draft 유지, 다시 열면 자동 복원
-- **잠금화면 알림** — 할 일별 잠금화면 노출 여부 개별 설정
+### ✅ 직관적인 할 일 관리
+- **우선순위 3단계**: 높음 / 보통 / 낮음 탭을 스와이프하여 오늘의 할 일을 체계적으로 탐색할 수 있습니다.
+- **D-Day 관리**: 마감일이 지정된 할 일들을 별도로 모아보고, 남은 기간(예: D-3, D-Day)을 쉽게 확인할 수 있습니다.
+- **BottomSheet 간편 입력**: FAB 버튼 한 번으로 제목 서식, 메모, 우선순위, 마감 시간을 빠르게 설정합니다.
+- **스와이프 및 Soft Delete**: 스와이프로 항목을 쉽게 지울 수 있으며, 휴지통으로 안전히 이동되어 실수로 삭제된 항목을 언제든 복구할 수 있습니다.
 
-### 2. 루틴 템플릿 시스템
-- **그룹 단위 템플릿** — 반복되는 할 일들을 하나의 그룹으로 묶어 재사용
-- **템플릿 이름 수정** — 상세 화면 헤더의 연필 아이콘으로 그룹 이름 즉시 변경
-- **자정 자동 주입** — 활성화된 템플릿은 매일 자정 오늘의 할 일 목록에 자동 추가
-- **즉시 추가(Manual Injection)** — '오늘 할 일에 즉시 추가하기' 버튼으로 원할 때 언제든 바로 적용
-- **중복 방지** — SharedPreferences 기반으로 동일 날짜에 재주입 차단
+### 🎯 체계적인 목표 관리 (Goals)
+- **다양한 목표 유형**: 단순 횟수, 주당 주기적인 빈도, 혹은 프로젝트 형태 등 목적에 맞는 목표를 세울 수 있습니다.
+- **할 일과의 연동**: 그날그날의 '할 일'들을 '목표'와 연동하여 달성도를 체계적으로 쌓아갈 수 있습니다.
+- **목표 현황 제공**: 각 목표의 진행률, 마감일, 하루 권장 할당량 및 상태(여유/위험 등)가 시각적으로 제공됩니다.
 
-### 3. 아카이브(기록) 시스템
-- **날짜별 완료 기록** — 달력(DatePicker)으로 특정 날짜의 완료 항목 조회
-- **UTC 버그 해결** — 타임존 오프셋을 정확히 보정, 날짜 선택이 항상 로컬 시간 기준
-- **수동 동기화** — 당일 완료 항목을 아카이브에 즉시 반영
-- **일괄 휴지통 이동** — 선택한 날짜의 완료 항목 전체를 한 번에 삭제
+### 🔄 루틴 템플릿 시스템
+- **그룹 단위 템플릿**: 매일 반복되는 작업을 그룹(예: 아침 루틴, 운동 루틴) 단위로 편리하게 관리합니다.
+- **자동 주입**: 활성화된 루틴들은 매일 자정에 '오늘의 할 일' 목록으로 자동 추가됩니다.
+- **수동 주입**: 자동 갱신 시간 이전이라도 필요할 때 '즉시 추가하기'를 눌러 일 단위로 바로 불러올 수 있습니다.
 
-### 4. 휴지통
-- **Soft Delete** — 삭제 즉시 영구 제거하지 않고 휴지통으로 이동 보관
-- **개별 복구** — 휴지통에서 항목을 원래 목록으로 되돌리기
-- **영구 삭제 / 비우기** — 개별 또는 전체 완전 삭제
+### 📦 아카이브 (기록 폴더)
+- **과거 처리 이력 보기**: 달력에서 원하는 특정 날짜를 선택하여 과거에 완료한 모든 일을 확인합니다.
+- **일괄 관리**: 해당 날짜에 마무리했던 목표와 작업들을 한 번에 비우거나 정리할 수 있습니다.
 
-### 5. 세밀한 UX
-- **통합 BackHandler** — 다이얼로그·BottomSheet가 열려 있을 때 뒤로 가기를 누르면 앱 종료 대신 해당 창만 닫힘
-- **마감 알림** — AlarmManager 기반, 마감 시각 정확 발생 + 사전 알림(10분/30분/1시간 전)
-- **상태바 상시 알림** — Foreground Service로 미완료 할 일 개수 실시간 표시
-- **부팅 후 알람 자동 복원** — `BOOT_COMPLETED` 수신 시 모든 알람 재등록
-- **화이트 톤 모달** — 모든 AlertDialog·DatePickerDialog·BottomSheet의 배경을 순수 화이트로 통일, 명확한 가독성 확보
+### 🔔 알림 및 실시간 상기
+- **상태바 알림**: 언제든지 폰 상태바에서 현재 남은 미완료 작업 개수를 파악할 수 있는 고정 알림 기능이 있습니다.
+- **사전 알람**: 마감 시간이 지정된 각 작업에 대해 10분, 30분, 1시간 전 등 원하는 시점에 개별 알람을 제공합니다.
 
-### 6. 자동화 CI/CD
-- **Release APK 자동 빌드·서명** — `v*` 태그 push 시 GitHub Actions가 키스토어로 서명 후 GitHub Release에 자동 게시
-- **AI 릴리즈 노트 자동 작성** — Gemini API가 커밋 메시지를 분석해 이 README의 변경 이력 섹션을 자동으로 업데이트
-
----
-
-## 기술 스택
-
-| 분류 | 기술 |
-|:---|:---|
-| **언어** | Kotlin |
-| **UI** | Jetpack Compose, Material 3, Pretendard 폰트 |
-| **아키텍처** | MVVM, Clean Architecture 패턴 지향, Single Activity |
-| **상태 관리** | StateFlow, Channel (일회성 이벤트) |
-| **로컬 DB** | Room Database (Flow 기반 반응형 쿼리, Migration v1→v5) |
-| **DI** | Dagger Hilt + KSP |
-| **비동기** | Kotlin Coroutines |
-| **알림** | AlarmManager, NotificationCompat, Foreground Service |
-| **CI/CD** | GitHub Actions (Debug 빌드 · Release 서명 · AI README 자동화) |
-| **AI** | Google Gemini API (릴리즈 노트 자동 생성) |
-| **최소 SDK** | API 26 (Android 8.0) |
-| **타겟 SDK** | API 35 (Android 15) |
-
----
-
-## 아키텍처
-
-```
-presentation/
-├── screen/
-│   ├── MainScreen.kt               # 루트 화면 — 탭 + TopAppBar + BackHandler
-│   ├── TaskItem.kt                 # 할 일 카드 (우선순위 컬러 액센트)
-│   ├── AddTaskBottomSheet.kt       # 할 일 추가/수정 시트
-│   ├── TemplateManageBottomSheet.kt# 루틴 템플릿 관리 시트 (그룹 목록 ↔ 그룹 상세)
-│   └── TrashScreen.kt              # 휴지통 화면
-├── viewmodel/
-│   └── TaskViewModel.kt            # UI 상태·draft 관리, 템플릿 자동/수동 주입
-└── theme/
-    ├── Color.kt                    # Deep Indigo 팔레트
-    ├── Type.kt                     # Pretendard 타이포그래피
-    └── Theme.kt                    # Material 3 ColorScheme
-
-data/
-├── local/
-│   ├── entity/
-│   │   ├── TaskEntity.kt                    # 할 일 (Priority, RepeatType, dueDate …)
-│   │   ├── RoutineTemplateGroupEntity.kt    # 템플릿 그룹
-│   │   ├── RoutineTemplateTaskEntity.kt     # 템플릿 할 일 (그룹 FK CASCADE)
-│   │   └── RoutineTemplateGroupWithTasks.kt # @Relation POJO (1:N)
-│   ├── dao/
-│   │   ├── TaskDao.kt
-│   │   └── RoutineTemplateDao.kt
-│   └── AppDatabase.kt              # Room DB (version 5, Migration 1→5)
-└── repository/
-    ├── TaskRepository(Impl).kt
-    └── RoutineTemplateRepository(Impl).kt
-
-service/
-├── TodoForegroundService.kt        # 상태바 상시 알림
-├── AlarmScheduler.kt               # AlarmManager 래퍼
-└── NotificationHelper.kt
-
-receiver/
-├── TodoAlarmReceiver.kt
-├── TaskActionReceiver.kt
-└── BootReceiver.kt
-
-.github/
-├── scripts/
-│   ├── gen_release_notes.py        # AI 릴리즈 노트 생성 스크립트
-│   └── inject_readme.py            # README.md 자동 주입 스크립트
-└── workflows/
-    └── android.yml                 # CI/CD 파이프라인 정의
-```
-
-### 데이터 흐름
-
-```
-Room DB (Flow)
-  └─ Repository
-      └─ ViewModel (StateFlow)
-          └─ Compose UI (collectAsStateWithLifecycle)
-              └─ 사용자 액션 → ViewModel → Repository → Room
-                                  ├─ AlarmScheduler
-                                  └─ TodoForegroundService
-```
-
----
-
-## 빌드 및 실행
-
-**요구 사항**
-- Android Studio Hedgehog 이상
-- JDK 17
-- Android 8.0 (API 26) 이상 기기 또는 에뮬레이터
-
-```bash
-git clone https://github.com/kanghyeonLee/ToDoList.git
-cd ToDoList
-./gradlew assembleDebug
-```
-
-서명된 릴리즈 APK는 [Releases](https://github.com/kanghyeonLee/ToDoList/releases) 페이지에서 다운로드할 수 있습니다.
-
----
-
-## CI/CD 파이프라인
-
-```
-main push / PR  →  Job 1: Debug APK 빌드 및 아티팩트 업로드
-v* 태그 push   →  Job 2: Release APK 서명 → GitHub Release 게시
-               →  Job 3: Gemini API로 커밋 분석 → README 릴리즈 노트 자동 업데이트
-```
-
-| 필요한 GitHub Secret | 설명 |
-|:---|:---|
-| `KEYSTORE_BASE64` | base64 인코딩된 .jks 키스토어 |
-| `KEY_ALIAS` | 키 alias |
-| `KEY_PASSWORD` | 키 비밀번호 |
-| `STORE_PASSWORD` | 키스토어 비밀번호 |
-| `LLM_API_KEY` | Gemini 또는 OpenAI API 키 |
-
-> GitHub Variables에서 `LLM_PROVIDER`를 `gemini` 또는 `openai`로 설정 (기본값: `gemini`)
-
----
-
-## 변경 이력 (Changelog)
-
-> 이 섹션은 `v*` 태그를 push할 때 AI(Gemini)가 커밋 메시지를 분석해 자동으로 업데이트합니다.
-
-<!-- CHANGELOG_START -->
-
-## v1.3.2 (2026-04-14)
-
-### 🚀 새로운 기능
-- 루틴 템플릿 이름 수정 기능 추가 — 상세 화면 헤더의 연필 아이콘을 눌러 그룹 이름을 즉시 변경할 수 있습니다
-
-### 🛠️ 개선 사항
-- 모든 AlertDialog · DatePickerDialog · BottomSheet의 배경색을 순수 화이트로 통일하여 가독성 향상
-- GitHub Actions 워크플로우의 YAML 인덴테이션 오류 수정 — Python 스크립트를 `.github/scripts/`로 분리하여 구조 개선
-
----
-
-## v1.3.1 (2025-12-01)
-
-### 🚀 새로운 기능
-- 루틴 템플릿 시스템 도입 — 반복 할 일을 그룹으로 묶어 관리하고 매일 자정 자동 주입
-- 템플릿별 하위 할 일 등록 및 활성화 토글 지원
-- 아카이브 수동 동기화 기능 추가 — 당일 완료 항목을 즉시 아카이브에 반영
-
-### 🐛 버그 수정
-- DatePicker 날짜 선택 시 UTC/로컬 타임존 오프셋 불일치 버그 수정
-- 스와이프 삭제 동작 오류 수정
-
-### 🛠️ 개선 사항
-- 완료된 할 일을 자정까지 메인 화면에 유지하도록 변경, 완료 카운터 UI 업데이트
-- 뒤로 가기 처리를 통합 BackHandler로 개선 — 오버레이 우선 닫기
-- TopAppBar 아이콘 교체 (archive-restore → layout-panel-top)
-
----
-
-## v1.3.0 (2025-10-15)
-
-### 🚀 새로운 기능
-- 우선순위별 스와이프 페이지(HorizontalPager) 도입 — 높음·보통·낮음 탭을 좌우 스와이프로 전환
-- 아카이브 탭에서 선택 날짜의 완료 항목 일괄 휴지통 이동 기능 추가
-
-### 📦 기타 변경
-- GitHub Actions CI/CD 파이프라인 추가 — Debug 빌드, Release 서명 및 AI 릴리즈 노트 자동화
-
----
-
-## v1.2.1 (2025-08-20)
-
-### 🛠️ 개선 사항
-- TimePicker 가독성 개선 및 탭 레이블 정리
-- 전반적인 UI를 모던 프리미엄 디자인으로 리뉴얼
-
----
-
-## v1.2.0 (2025-07-10)
-
-### 🚀 새로운 기능
-- 할 일 완료 체크 토글 및 스와이프 삭제 구현
-- 소프트 딜리트(Soft Delete) 휴지통 기능 — 삭제 항목 복구 및 영구 삭제 지원
-
-### 🛠️ 개선 사항
-- Deep Indigo 프리미엄 테마 및 커스텀 리소스 적용
-- TimePicker를 스피너 스타일로 교체, 아카이브 날짜 선택 UI 단순화
-- BottomSheet 키보드 UX 개선
-- 공식 앱 아이콘 적용
-
-### 📦 기타 변경
-- 실험적 Now Bar 기능 제거
-
----
-
-## v1.1.0 (2025-05-22)
-
-### 🚀 새로운 기능
-- 할 일 수정 기능 — 기존 항목을 탭하면 동일한 BottomSheet에서 수정 가능
-- 마감 시간 설정 — 오늘 날짜 고정, 시간만 선택 + 현재 기준 5분 이후 제약
-- 아카이브 탭 날짜별 필터링 — DatePicker로 특정 날짜의 완료 항목 조회
-- 우선순위 기반 할 일 정렬·그룹화
-
-### 🛠️ 개선 사항
-- 탭 구조를 '할 일 / 아카이브'로 개편
-
----
-
-## v1.0.0 (2025-03-10)
-
-### 🚀 새로운 기능
-- Jetpack Compose + HiltViewModel 기반 초기 앱 구조 구축
-- Foreground Service로 상태바 상시 알림(미완료 할 일 개수) 표시
-- 부팅 후 알람 자동 복원 (BootReceiver)
-
-### 🐛 버그 수정
-- 빌드 설정 및 컴파일 오류 전반 수정
-- RemoteViews inflation 크래시 해결
-- TOML 파싱 오류 수정
-
-<!-- CHANGELOG_END -->
