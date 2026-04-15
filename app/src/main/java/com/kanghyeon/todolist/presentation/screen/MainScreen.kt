@@ -85,6 +85,7 @@ import com.kanghyeon.todolist.presentation.theme.CardBorderColor
 import com.kanghyeon.todolist.presentation.theme.PriorityHigh
 import com.kanghyeon.todolist.presentation.theme.PriorityLow
 import com.kanghyeon.todolist.presentation.theme.PriorityMedium
+import com.kanghyeon.todolist.presentation.viewmodel.GoalViewModel
 import com.kanghyeon.todolist.presentation.viewmodel.NewTaskDraft
 import com.kanghyeon.todolist.presentation.viewmodel.TaskEvent
 import com.kanghyeon.todolist.presentation.viewmodel.TaskUiState
@@ -101,8 +102,9 @@ import java.util.Locale
 // ══════════════════════════════════════════════════════════════════
 private enum class MainTab(val title: String, @DrawableRes val iconRes: Int) {
     DDAY("D-Day", R.drawable.calendar_clock),
-    TASKS("할 일", R.drawable.house), 
-    ARCHIVE("아카이브", R.drawable.archive)     
+    TASKS("할 일", R.drawable.house),
+    ARCHIVE("아카이브", R.drawable.archive),
+    GOALS("목표", R.drawable.calendar_check),
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -122,7 +124,8 @@ private data class PriorityPageMeta(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    viewModel: TaskViewModel = hiltViewModel(),
+    viewModel:     TaskViewModel = hiltViewModel(),
+    goalViewModel: GoalViewModel = hiltViewModel(),
 ) {
     val uiState              by viewModel.uiState.collectAsStateWithLifecycle()
     val archiveDate          by viewModel.selectedArchiveDate.collectAsStateWithLifecycle()
@@ -130,6 +133,9 @@ fun MainScreen(
     val dDayTasks            by viewModel.dDayTasks.collectAsStateWithLifecycle()
     val editingTask          by viewModel.editingTask.collectAsStateWithLifecycle()
     val newTaskDraft         by viewModel.newTaskDraft.collectAsStateWithLifecycle()
+    val goalsWithProgress    by goalViewModel.goalsWithProgress.collectAsStateWithLifecycle()
+    val selectedGoalProgress by goalViewModel.selectedGoalWithProgress.collectAsStateWithLifecycle()
+    val goalTasks            by goalViewModel.selectedGoalTasks.collectAsStateWithLifecycle()
 
     val snackbarHostState      = remember { SnackbarHostState() }
     var showBottomSheet        by remember { mutableStateOf(false) }
@@ -140,6 +146,12 @@ fun MainScreen(
     var showBulkDeleteConfirm    by remember { mutableStateOf(false) }
     var showSyncConfirm          by remember { mutableStateOf(false) }
     var showTemplateManage       by remember { mutableStateOf(false) }
+    // 목표 관련
+    var showGoalSheet            by remember { mutableStateOf(false) }
+    var goalDetailId             by remember { mutableStateOf<Long?>(null) }
+    /** FAB에서 미리 선택할 goalId (GoalDetail FAB → AddTaskBottomSheet) */
+    var pendingGoalId            by remember { mutableStateOf<Long?>(null) }
+    var editGoal                 by remember { mutableStateOf<com.kanghyeon.todolist.data.local.entity.GoalEntity?>(null) }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -168,19 +180,21 @@ fun MainScreen(
     }
 
     // ── 시스템 뒤로 가기(Back Press) 통합 핸들링 ──────────────────────
-    val isAnyOverlayOpen = showTrashScreen || showTemplateManage || showBottomSheet || 
-                           showSyncConfirm || showBulkDeleteConfirm || editingTask != null
+    val isAnyOverlayOpen = showTrashScreen || showTemplateManage || showBottomSheet ||
+                           showSyncConfirm || showBulkDeleteConfirm || editingTask != null ||
+                           goalDetailId != null || showGoalSheet
 
     BackHandler(enabled = isAnyOverlayOpen) {
         when {
             showSyncConfirm -> showSyncConfirm = false
             showBulkDeleteConfirm -> showBulkDeleteConfirm = false
-            
-           
+            goalDetailId != null -> {
+                goalDetailId = null
+                goalViewModel.selectGoal(null)
+            }
+            showGoalSheet -> showGoalSheet = false
             showTrashScreen -> showTrashScreen = false
             showTemplateManage -> showTemplateManage = false
-            
-           
             showBottomSheet || editingTask != null -> {
                 showBottomSheet = false
                 viewModel.setEditingTask(null)
@@ -305,9 +319,16 @@ fun MainScreen(
             )
         },
         floatingActionButton = {
-            if (selectedTab == MainTab.TASKS.ordinal || selectedTab == MainTab.DDAY.ordinal) {
+            if (selectedTab == MainTab.TASKS.ordinal || selectedTab == MainTab.GOALS.ordinal) {
                 FloatingActionButton(
-                    onClick        = { showBottomSheet = true },
+                    onClick = { 
+                        if (selectedTab == MainTab.GOALS.ordinal) {
+                            goalViewModel.resetInput()
+                            showGoalSheet = true
+                        } else {
+                            showBottomSheet = true
+                        }
+                    },
                     shape          = CircleShape,
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor   = Color.White,
@@ -392,6 +413,37 @@ fun MainScreen(
                     viewModel = viewModel,
                     onEdit    = { viewModel.setEditingTask(it) },
                 )
+                currentTab == MainTab.GOALS -> {
+                    if (goalDetailId == null) {
+                        GoalTabContent(
+                            goalsWithProgress = goalsWithProgress,
+                            onGoalClick = { id -> 
+                                goalDetailId = id
+                                goalViewModel.selectGoal(id)
+                            }
+                        )
+                    } else {
+                        GoalDetailContent(
+                            gwp = selectedGoalProgress,
+                            tasks = goalTasks,
+                            onBack = { 
+                                goalDetailId = null
+                                goalViewModel.selectGoal(null)
+                            },
+                            onToggleDone = { viewModel.toggleTaskCompletion(it) },
+                            onDeleteTask = { viewModel.deleteTask(it) },
+                            onEditTask   = { viewModel.setEditingTask(it) },
+                            onDeleteGoal = { 
+                                goalViewModel.deleteGoal(goalDetailId!!)
+                                goalDetailId = null
+                            },
+                            onEditGoal   = { 
+                                editGoal = selectedGoalProgress?.goal
+                                showGoalSheet = true 
+                            }
+                        )
+                    }
+                }
             }
         }
     }
@@ -468,12 +520,23 @@ fun MainScreen(
         )
     }
 
+    // ── 목표 추가 / 수정 BottomSheet ──────────────────────────────
+    if (showGoalSheet) {
+        AddGoalBottomSheet(
+            goalViewModel = goalViewModel,
+            onDismiss     = { showGoalSheet = false; editGoal = null },
+            editGoal      = editGoal
+        )
+    }
+
     // ── 할 일 추가 / 수정 BottomSheet ──────────────────────────────
     if (showBottomSheet || editingTask != null) {
         val isNewTask = editingTask == null
         AddTaskBottomSheet(
             task          = editingTask,
             initialDraft  = if (isNewTask) newTaskDraft else NewTaskDraft(),
+            initialGoalId = pendingGoalId,
+            availableGoals = goalsWithProgress,
             onDraftChange = { draft -> if (isNewTask) viewModel.updateNewTaskDraft(draft) },
             onDismiss     = {
                 showBottomSheet = false
@@ -484,7 +547,7 @@ fun MainScreen(
                 viewModel.setEditingTask(null)
                 if (isNewTask) viewModel.clearNewTaskDraft()
             },
-            onSave = { title, desc, priority, dueDate, showOnLock, reminderMinutes ->
+            onSave = { title, desc, priority, dueDate, showOnLock, reminderMinutes, goalId ->
                 viewModel.saveCurrentTask(
                     title            = title,
                     description      = desc,
@@ -492,6 +555,7 @@ fun MainScreen(
                     dueDate          = dueDate,
                     showOnLockScreen = showOnLock,
                     reminderMinutes  = reminderMinutes,
+                    goalId           = goalId 
                 )
                 showBottomSheet = false
             },
@@ -925,7 +989,7 @@ private fun ArchiveContent(
 // ══════════════════════════════════════════════════════════════════
 
 @Composable
-private fun ScreenSectionHeader(
+fun ScreenSectionHeader(
     title:    String,
     iconRes:  Int,
     modifier: Modifier = Modifier,
@@ -964,7 +1028,7 @@ private fun ScreenSectionHeader(
 }
 
 @Composable
-private fun LoadingContent() {
+fun LoadingContent() {
     Box(
         modifier         = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
@@ -974,7 +1038,7 @@ private fun LoadingContent() {
 }
 
 @Composable
-private fun EmptyContent(
+fun EmptyContent(
     iconRes:    Int,
     message:    String,
     subMessage: String,

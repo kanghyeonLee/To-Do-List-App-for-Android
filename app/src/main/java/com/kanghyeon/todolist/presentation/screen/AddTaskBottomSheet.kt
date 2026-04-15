@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -77,6 +79,8 @@ import com.kanghyeon.todolist.presentation.theme.CardBorderColor
 import com.kanghyeon.todolist.presentation.theme.PriorityHigh
 import com.kanghyeon.todolist.presentation.theme.PriorityLow
 import com.kanghyeon.todolist.presentation.theme.PriorityMedium
+import com.kanghyeon.todolist.presentation.viewmodel.GoalWithProgress
+import com.kanghyeon.todolist.data.local.entity.GoalEntity
 import com.kanghyeon.todolist.presentation.viewmodel.NewTaskDraft
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -111,10 +115,14 @@ fun AddTaskBottomSheet(
         dueDate: Long?,
         showOnLockScreen: Boolean,
         reminderMinutes: Int?,
+        goalId: Long?,
     ) -> Unit,
+    goals: List<GoalEntity> = emptyList(),
     onDraftChange: (NewTaskDraft) -> Unit = {},
     task: TaskEntity? = null,
     initialDraft: NewTaskDraft = NewTaskDraft(),
+    initialGoalId: Long? = null,
+    availableGoals: List<GoalWithProgress> = emptyList(),
 ) {
     val isEditMode = task != null
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -159,6 +167,7 @@ fun AddTaskBottomSheet(
     var reminderMinutes  by remember { mutableStateOf<Int?>(task?.reminderMinutes ?: initialDraft.reminderMinutes) }
     var showTimePicker   by remember { mutableStateOf(false) }
     var showDatePicker   by remember { mutableStateOf(false) }
+    var selectedGoalId   by remember { mutableStateOf(initialGoalId ?: task?.goalId) }
 
     // 상태 변경 시 draft 동기화 (추가 모드에서만 의미 있음)
     fun syncDraft() {
@@ -216,6 +225,7 @@ fun AddTaskBottomSheet(
             dueDate,
             showOnLockScreen,
             reminderMinutes,
+            selectedGoalId,
         )
         scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
     }
@@ -591,6 +601,65 @@ fun AddTaskBottomSheet(
                         ReminderChip("10분",  reminderMinutes == 10)   { reminderMinutes = 10;  syncDraft() }
                         ReminderChip("30분",  reminderMinutes == 30)   { reminderMinutes = 30;  syncDraft() }
                         ReminderChip("1시간", reminderMinutes == 60)   { reminderMinutes = 60;  syncDraft() }
+                    }
+                }
+            }
+
+            // ── 목표 연동 (목표가 있는 경우에만 표시) ──────────
+            if (availableGoals.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text  = "목표 연동",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color(0xFF6B7280),
+                    )
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // "없음" 칩
+                        item {
+                            val isNone = selectedGoalId == null
+                            FilterChip(
+                                selected = isNone,
+                                onClick  = { selectedGoalId = null },
+                                label    = { Text("없음") },
+                                shape    = CircleShape,
+                                colors   = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Color(0xFF6B7280).copy(alpha = 0.15f),
+                                    selectedLabelColor     = Color(0xFF6B7280),
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled             = true,
+                                    selected            = isNone,
+                                    selectedBorderColor = Color(0xFF6B7280),
+                                    selectedBorderWidth = 1.5.dp,
+                                ),
+                            )
+                        }
+                        items(availableGoals) { gwp ->
+                            val isSelected = selectedGoalId == gwp.goal.id
+                            val accentColor = try {
+                                Color(android.graphics.Color.parseColor(gwp.goal.colorHex))
+                            } catch (_: Exception) {
+                                MaterialTheme.colorScheme.primary
+                            }
+                            FilterChip(
+                                selected = isSelected,
+                                onClick  = {
+                                    selectedGoalId = if (isSelected) null else gwp.goal.id
+                                },
+                                label    = { Text(gwp.goal.title, maxLines = 1) },
+                                shape    = CircleShape,
+                                colors   = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = accentColor.copy(alpha = 0.15f),
+                                    selectedLabelColor     = accentColor,
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled             = true,
+                                    selected            = isSelected,
+                                    selectedBorderColor = accentColor,
+                                    selectedBorderWidth = 1.5.dp,
+                                ),
+                            )
+                        }
                     }
                 }
             }

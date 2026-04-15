@@ -193,6 +193,32 @@ interface TaskDao {
     @Query("DELETE FROM tasks WHERE isDone = 1 AND isDeleted = 0")
     suspend fun deleteAllCompleted()
 
+    // ──────────────────────────────────────────
+    // 목표(Goal) 연동 쿼리
+    // ──────────────────────────────────────────
+
+    /**
+     * 특정 목표에 연결된 활성 Task 목록 (PROJECT 탭 하위 할 일 표시용).
+     * 삭제·아카이브된 항목 제외, 미완료 우선 + 생성 역순 정렬.
+     */
+    @Query(
+        """
+        SELECT * FROM tasks
+        WHERE goalId    = :goalId
+          AND isDeleted = 0
+          AND isArchived = 0
+        ORDER BY isDone ASC, createdAt DESC
+        """
+    )
+    fun getActiveTasksByGoalId(goalId: Long): Flow<List<TaskEntity>>
+
+    /**
+     * goalId가 연결된 Task에서 goalId를 해제한다.
+     * 목표 삭제 시 연결된 Task가 고아 상태가 되지 않도록 호출.
+     */
+    @Query("UPDATE tasks SET goalId = NULL WHERE goalId = :goalId")
+    suspend fun unlinkGoalFromTasks(goalId: Long)
+
     /**
      * 할 일을 아카이브로 이동.
      * isArchived = 1, archivedAt = 지정 날짜(epoch ms), updatedAt 갱신.

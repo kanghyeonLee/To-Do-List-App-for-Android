@@ -84,6 +84,14 @@ data class TaskEntity(
      * 아카이브 탭 날짜 필터링의 기준 컬럼으로 사용됨.
      */
     val archivedAt: Long? = null,
+
+    /**
+     * 연결된 목표 ID (goals.id 참조, null = 목표 미연결).
+     * 목표 탭에서 COUNT / PROJECT 진행률을 계산하는 데 사용된다.
+     * Room Foreign Key를 명시하지 않고 애플리케이션 레벨에서 관계를 관리한다.
+     * (목표 삭제 시 TaskDao.unlinkGoalFromTasks()로 null 처리)
+     */
+    val goalId: Long? = null,
 )
 
 // ───────────────────────────────────────────────
